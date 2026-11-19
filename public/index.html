@@ -57,8 +57,8 @@
               <span class="pill">JUGADOR VS. INTELIGENCIA</span>
               <h2>Piensa tu jugada.<br />Prolog ya piensa la suya.</h2>
               <p>
-                Un tablero de nueve casillas. Un rival que explora cada
-                posibilidad. ¿Puedes encontrar el empate perfecto?
+                Un tablero de nueve casillas y tres niveles para desafiarte.
+                Elige tu dificultad y encuentra tu próxima victoria.
               </p>
               <button class="primary" data-start="tic-tac-toe">
                 Jugar Gato <span>＋</span>
@@ -175,6 +175,7 @@
             </div>
             <div class="play-actions">
               <button class="secondary" id="pause-game">Pausar</button
+              ><button class="secondary" id="how-to-play">Cómo jugar</button
               ><button class="secondary" id="new-tab">
                 Abrir en otra pestaña</button
               ><button class="danger" id="finish-game">Finalizar</button>
@@ -209,5 +210,38 @@
         </footer>
       </main>
     </div>
+    <dialog
+      id="game-setup"
+      class="game-setup"
+      aria-labelledby="setup-title"
+      aria-describedby="setup-description"
+    >
+      <form id="setup-form">
+        <div class="setup-top">
+          <span class="eyebrow" id="setup-tag">ANTES DE JUGAR</span
+          ><button
+            type="button"
+            class="dialog-close"
+            id="setup-close"
+            aria-label="Cerrar instrucciones"
+          >
+            ×
+          </button>
+        </div>
+        <h2 id="setup-title">Prepara tu partida</h2>
+        <p id="setup-description"></p>
+        <div id="setup-rules" class="setup-rules"></div>
+        <div id="setup-options"></div>
+        <p class="setup-hint" id="setup-hint"></p>
+        <p id="setup-error" class="setup-error" role="alert" hidden></p>
+        <div class="setup-actions">
+          <button type="button" class="secondary" id="setup-cancel">
+            Ahora no</button
+          ><button type="submit" class="primary" id="setup-confirm">
+            Empezar partida
+          </button>
+        </div>
+      </form>
+    </dialog>
   </body>
 </html>

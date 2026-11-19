@@ -29,6 +29,11 @@ AI_DECISION y OBSTACLE_HIT son compatibles con el sobre y no alteran los perfile
 | GET /api/matches/{id}/results | Consultar resultados reales de GameStats. |
 | GET /api/dashboard | Consultar resumen real de GameStats. |
 
+Al crear partida, options admite `{difficulty:"easy|medium|hard"}` para Gato
+y `{size:12|20|28}` para Snake. Omitir opciones conserva alta y 20×20.
+Valores no admitidos producen 400 sin registrar instancia. Los valores elegidos
+se incluyen en snapshot y data de inicio como difficulty/gridSize.
+
 Acciones: Gato `{index:0..8}` o `{retryAI:true}`; Snake
 `{direction:"up|down|left|right"}`; Circuito `{lane:0..2,accelerate:true,brake:false}`.
 Solicitudes inválidas: 400; inexistentes: 404; partida cerrada/turno pendiente:409;

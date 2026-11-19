@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 const program = fileURLToPath(new URL("../prolog/gato.pl", import.meta.url));
 export function decide(
   board,
-  { binary = process.env.SWIPL_PATH || "swipl" } = {},
+  { binary = process.env.SWIPL_PATH || "swipl", difficulty = "hard" } = {},
 ) {
   return new Promise((resolve, reject) => {
     const child = spawn(
@@ -44,7 +44,11 @@ export function decide(
     });
     child.stdin.on("error", () => {});
     child.stdin.end(
-      JSON.stringify({ board: board.map((v) => v || "e"), player: "O" }) + "\n",
+      JSON.stringify({
+        board: board.map((v) => v || "e"),
+        player: "O",
+        difficulty,
+      }) + "\n",
     );
   });
 }

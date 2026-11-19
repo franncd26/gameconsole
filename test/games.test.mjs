@@ -3,6 +3,36 @@ import assert from "node:assert/strict";
 import { TicTacToe, Snake, Racing } from "../server/games.mjs";
 import { decide } from "../server/prolog.mjs";
 const sink = () => {};
+test("Gato aplica cada dificultad mediante Prolog real y puede ganarse en baja", async () => {
+  const easy = new TicTacToe(sink, decide, { difficulty: "easy" });
+  await easy.action({ index: 4 });
+  await easy.action({ index: 2 });
+  await easy.action({ index: 6 });
+  assert.equal(easy.result, "human_won");
+  assert.equal(easy.lastDecision.algorithm, "reglas_basicas");
+  const medium = new TicTacToe(sink, decide, { difficulty: "medium" });
+  await medium.action({ index: 0 });
+  assert.equal(medium.board[4], "O");
+  assert.equal(medium.lastDecision.algorithm, "reglas_tacticas");
+  assert.equal(medium.events[0].data.difficulty, "medium");
+  assert.throws(() => new TicTacToe(sink, decide, { difficulty: "other" }));
+});
+test("Snake adapta posiciones, comida y paredes a cada tamaño", async () => {
+  for (const size of [12, 20, 28]) {
+    const g = new Snake(sink, () => 0, { size });
+    assert.equal(g.snapshot().size, size);
+    assert.ok(
+      g.body.every((p) => p.x >= 0 && p.y >= 0 && p.x < size && p.y < size),
+    );
+    assert.ok(g.food.x < size && g.food.y < size);
+    assert.equal(g.events[0].data.gridSize, size);
+    for (let i = 0; i < size && g.state === "open"; i++)
+      await g.action({ direction: "right" });
+    assert.equal(g.result, "game_over");
+  }
+  for (const size of [0, 10, 13, 100, "20", null])
+    assert.throws(() => new Snake(sink, Math.random, { size }));
+});
 test("Gato ejecuta Prolog real y emite jugada y decisión compatibles", async () => {
   const events = [];
   const g = new TicTacToe((e) => events.push(e), decide);

@@ -92,11 +92,16 @@ export function createApp({
             "Se alcanzó el límite de 500 partidas de esta sesión. Reinicia el servicio para una nueva sesión.",
             429,
           );
-        const { gameId } = await body(req);
+        const input = await body(req);
+        if (!input || typeof input !== "object" || Array.isArray(input))
+          throw new GameError("La configuración debe ser un objeto JSON.");
+        const { gameId, options = {} } = input;
+        if (!options || typeof options !== "object" || Array.isArray(options))
+          throw new GameError("Opciones de partida inválidas.");
         const emit = (e) => outbox.enqueue(e);
         let m;
-        if (gameId === "tic-tac-toe") m = new TicTacToe(emit, ai);
-        else if (gameId === "snake") m = new Snake(emit);
+        if (gameId === "tic-tac-toe") m = new TicTacToe(emit, ai, options);
+        else if (gameId === "snake") m = new Snake(emit, Math.random, options);
         else if (gameId === "racing") m = new Racing(emit);
         else throw new GameError("Juego desconocido.");
         matches.set(m.id, m);

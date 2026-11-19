@@ -29,6 +29,11 @@ partidas progresan independientemente. El servidor mantiene las reglas y la IA.
 
 ## Prolog
 
+Los tres niveles se ejecutan en Prolog: baja toma una victoria inmediata o una
+casilla libre; media agrega bloqueo de amenazas y preferencia por el centro;
+alta conserva minimax completo. No hay selección aleatoria de movimientos.
+La configuración se registra en MATCH_STARTED y la interfaz propone media.
+
 El tablero se representa con nueve átomos: X, O y e. Las reglas reconocen líneas
 ganadoras, generan movimientos legales y exploran estados alternando jugadores.
 Minimax maximiza para O y minimiza para X: victoria O = 10, empate = 0,

@@ -21,6 +21,29 @@ test("API de consola valida juegos, origen, turnos y métodos", async (t) => {
     });
   assert.equal((await fetch(base + "/")).status, 200);
   assert.equal((await req("/api/matches", { gameId: "unknown" })).status, 400);
+  const configured = await req("/api/matches", {
+    gameId: "snake",
+    options: { size: 12 },
+  });
+  assert.equal(configured.status, 201);
+  assert.equal((await configured.json()).size, 12);
+  const easy = await req("/api/matches", {
+    gameId: "tic-tac-toe",
+    options: { difficulty: "easy" },
+  });
+  assert.equal((await easy.json()).difficulty, "easy");
+  for (const input of [
+    null,
+    [],
+    { gameId: "snake", options: null },
+    { gameId: "snake", options: { size: 13 } },
+    { gameId: "snake", options: { size: "20" } },
+    { gameId: "tic-tac-toe", options: { difficulty: "impossible" } },
+  ]) {
+    const count = app.matches.size;
+    assert.equal((await req("/api/matches", input)).status, 400);
+    assert.equal(app.matches.size, count);
+  }
   const created = await req("/api/matches", { gameId: "tic-tac-toe" });
   assert.equal(created.status, 201);
   const m = await created.json();

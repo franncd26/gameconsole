@@ -5,6 +5,66 @@ const tags = {
   snake: "REFLEJOS · UN JUGADOR",
   racing: "VELOCIDAD · TRES VUELTAS",
 };
+const difficultyNames = { easy: "Baja", medium: "Media", hard: "Alta" };
+const instructions = {
+  "tic-tac-toe": {
+    description:
+      "Un tablero, nueve casillas y un rival en Prolog. Elige cuánto quieres desafiarte.",
+    rules: [
+      [
+        "Tu objetivo",
+        "Completa una fila, columna o diagonal de tres símbolos X.",
+      ],
+      [
+        "Cómo jugar",
+        "Selecciona una casilla vacía. Tú juegas con X y Prolog responde con O.",
+      ],
+      [
+        "Cómo termina",
+        "Ganas con una línea de X; pierdes con una línea de O. Si se llena el tablero sin líneas, hay empate.",
+      ],
+    ],
+    hint: "Todas las dificultades usan reglas de Prolog. En alta, una buena partida termina en empate: la IA no comete errores.",
+  },
+  snake: {
+    description:
+      "Come manzanas, haz crecer la serpiente y administra el espacio. Tú eliges el tamaño del reto.",
+    rules: [
+      [
+        "Tu objetivo",
+        "Suma 10 puntos por manzana. El reto máximo es llenar la cuadrícula.",
+      ],
+      [
+        "Cómo jugar",
+        "Usa las flechas, WASD o los botones de dirección. No puedes girar directamente hacia tu cuerpo.",
+      ],
+      [
+        "Cómo termina",
+        "Pierdes al chocar con una pared o contigo mismo. Ganas si ocupas todas las casillas.",
+      ],
+    ],
+    hint: "La velocidad es la misma en todos los tableros. Una cuadrícula más grande ofrece más espacio para maniobrar. Puedes pausar con Espacio.",
+  },
+  racing: {
+    description:
+      "Circuito es una carrera individual de tres vueltas. Tu reto es llegar a la meta con el menor tiempo posible.",
+    rules: [
+      [
+        "Tu objetivo",
+        "Completa tres vueltas. La barra superior indica tu avance en la vuelta actual.",
+      ],
+      [
+        "Cómo jugar",
+        "Mantén ↑ o W para acelerar y ↓ o S para frenar. ← y →, o A y D, cambian de carril. También puedes mantener pulsados los controles en pantalla.",
+      ],
+      [
+        "Cómo termina",
+        "Ganas al completar la tercera vuelta. Los obstáculos morados reducen tu velocidad, pero no te eliminan. No hay límite de tiempo ni derrota automática; puedes abandonar con Finalizar.",
+      ],
+    ],
+    hint: "Evita los obstáculos cambiando de carril antes de alcanzarlos. Los tiempos incluyen las pausas.",
+  },
+};
 const escape = (s) =>
   String(s ?? "").replace(
     /[&<>"']/g,
@@ -52,14 +112,14 @@ class GameConsole {
     }, 2500);
     this.loop = setInterval(() => this.tick(), 110);
     const q = new URLSearchParams(location.search);
-    if (q.get("game") && names[q.get("game")]) this.start(q.get("game"));
+    if (q.get("game") && names[q.get("game")]) this.prepare(q.get("game"));
     else if (q.get("match")) this.open(q.get("match"));
   }
   bind() {
     document
       .querySelectorAll("[data-start]")
       .forEach((b) =>
-        b.addEventListener("click", () => this.start(b.dataset.start)),
+        b.addEventListener("click", () => this.prepare(b.dataset.start)),
       );
     document
       .querySelectorAll("[data-view]")
@@ -77,12 +137,44 @@ class GameConsole {
       if (this.current)
         window.open("/?game=" + this.current.gameId, "_blank", "noopener");
     };
-    $("#play-again").onclick = () => this.start(this.current.gameId);
+    $("#play-again").onclick = () => this.prepare(this.current.gameId);
+    $("#how-to-play").onclick = () => this.prepare(this.current.gameId, true);
+    const dialog = $("#game-setup");
+    const closeSetup = () => {
+      if (!this.setupBusy) dialog.close();
+    };
+    $("#setup-close").onclick = closeSetup;
+    $("#setup-cancel").onclick = closeSetup;
+    dialog.addEventListener("cancel", (e) => {
+      if (this.setupBusy) e.preventDefault();
+    });
+    dialog.addEventListener("close", () => {
+      if (this.current?.id === this.setupPreviousId)
+        this.paused = this.setupPreviousPaused;
+      if (!this.current) history.replaceState(null, "", "/");
+    });
+    $("#setup-form").onsubmit = async (e) => {
+      e.preventDefault();
+      if (this.setupBusy) return;
+      if (this.setupHelpOnly) {
+        dialog.close();
+        return;
+      }
+      const data = new FormData(e.currentTarget);
+      const options =
+        this.setupGame === "tic-tac-toe"
+          ? { difficulty: data.get("difficulty") }
+          : this.setupGame === "snake"
+            ? { size: Number(data.get("size")) }
+            : {};
+      await this.start(this.setupGame, options);
+    };
     $("#retry-ai").onclick = () => this.action({ retryAI: true });
     document.addEventListener("keydown", (e) => {
       if (
         this.view !== "play" ||
         !this.current ||
+        dialog.open ||
         e.target.matches("input,textarea")
       )
         return;
@@ -137,19 +229,89 @@ class GameConsole {
       this.keys.clear();
     } else this.render();
   }
-  async start(gameId) {
+  prepare(gameId, helpOnly = false) {
+    if (!instructions[gameId] || $("#game-setup").open) return;
+    this.setupGame = gameId;
+    this.setupHelpOnly = helpOnly;
+    this.setupPreviousId = this.current?.id;
+    this.setupPreviousPaused = this.paused;
+    this.paused = true;
+    this.keys.clear();
+    this.touchAccelerate = false;
+    this.touchBrake = false;
+    const info = instructions[gameId];
+    $("#setup-tag").textContent = helpOnly ? "GUÍA DE JUEGO" : "ANTES DE JUGAR";
+    $("#setup-title").textContent = helpOnly
+      ? `Cómo jugar ${names[gameId]}`
+      : `Prepara tu partida de ${names[gameId]}`;
+    $("#setup-description").textContent = info.description;
+    $("#setup-rules").innerHTML = info.rules
+      .map(([title, text]) => `<div><h3>${title}</h3><p>${text}</p></div>`)
+      .join("");
+    $("#setup-hint").textContent = info.hint;
+    const previous = this.current?.gameId === gameId ? this.current : null;
+    $("#setup-options").innerHTML = helpOnly
+      ? ""
+      : gameId === "tic-tac-toe"
+        ? `<fieldset><legend>Elige la dificultad</legend><div class="setup-choices">${[
+            ["easy", "Baja", "Un rival que puede dejarte oportunidades."],
+            [
+              "medium",
+              "Media",
+              "Reconoce victorias y bloquea amenazas directas.",
+            ],
+            ["hard", "Alta", "Minimax: explora todas las posibilidades."],
+          ]
+            .map(
+              ([value, label, description]) =>
+                `<label class="setup-choice"><input type="radio" name="difficulty" value="${value}" ${value === (previous?.difficulty || "medium") ? "checked" : ""}><span><strong>${label}</strong><small>${description}</small></span></label>`,
+            )
+            .join("")}</div></fieldset>`
+        : gameId === "snake"
+          ? `<fieldset><legend>Elige la cuadrícula</legend><div class="setup-choices">${[
+              [12, "Compacta", "Menos espacio, giros más precisos."],
+              [20, "Clásica", "Un tablero equilibrado para empezar."],
+              [28, "Amplia", "Más espacio para recorrer y crecer."],
+            ]
+              .map(
+                ([size, label, description]) =>
+                  `<label class="setup-choice"><input type="radio" name="size" value="${size}" ${size === (previous?.size || 20) ? "checked" : ""}><span><strong>${size} × ${size} · ${label}</strong><small>${description}</small></span></label>`,
+              )
+              .join("")}</div></fieldset>`
+          : "";
+    $("#setup-error").hidden = true;
+    $("#setup-confirm").textContent = helpOnly
+      ? "Entendido"
+      : "Empezar partida";
+    $("#setup-cancel").hidden = helpOnly;
+    $("#game-setup").showModal();
+  }
+  async start(gameId, options = {}) {
+    this.setupBusy = true;
+    $("#setup-confirm").disabled = true;
+    $("#setup-confirm").textContent = "Preparando…";
+    $("#setup-close").disabled = true;
+    $("#setup-cancel").disabled = true;
     try {
-      const m = await api("/matches", "POST", { gameId });
+      const m = await api("/matches", "POST", { gameId, options });
       this.current = m;
       this.paused = gameId !== "tic-tac-toe";
       this.keys.clear();
       this.direction = "right";
+      $("#game-setup").close();
       this.show("play");
       this.mount();
       this.refreshSessions();
       history.replaceState(null, "", "/?match=" + m.id);
     } catch (e) {
-      notice(e.message);
+      $("#setup-error").hidden = false;
+      $("#setup-error").textContent = e.message;
+    } finally {
+      this.setupBusy = false;
+      $("#setup-confirm").disabled = false;
+      $("#setup-confirm").textContent = "Empezar partida";
+      $("#setup-close").disabled = false;
+      $("#setup-cancel").disabled = false;
     }
   }
   async open(id) {
@@ -214,6 +376,7 @@ class GameConsole {
       !m ||
       this.view !== "play" ||
       this.paused ||
+      $("#game-setup").open ||
       document.hidden ||
       m.state === "closed" ||
       this.busy
@@ -370,12 +533,16 @@ class GameConsole {
           : "Pulsa Continuar. Mantén ↑ o W para acelerar; ↓ o S para frenar. Usa ← y → para cambiar de carril. Completa tres vueltas.";
     $("#play-score").textContent =
       m.gameId === "snake"
-        ? `${m.points} puntos`
+        ? `${m.points} puntos · ${m.size}×${m.size}`
         : m.gameId === "racing"
           ? `${m.speed} km/h · ${Math.min(m.lap + 1, 3)}/3`
-          : `${m.turn} movimientos`;
+          : `${m.turn} movimientos · ${difficultyNames[m.difficulty] || "Alta"}`;
     $("#ai-explanation").textContent = m.lastDecision
-      ? `Minimax exploró el tablero y eligió la casilla ${m.lastDecision.index + 1}. Evaluación: ${m.lastDecision.score} (10: victoria de O, 0: empate, −10: victoria de X).`
+      ? m.lastDecision.algorithm === "reglas_basicas"
+        ? `Prolog eligió la casilla ${m.lastDecision.index + 1} con reglas básicas. Busca ganar, pero puede dejar amenazas sin bloquear.`
+        : m.lastDecision.algorithm === "reglas_tacticas"
+          ? `Prolog eligió la casilla ${m.lastDecision.index + 1} con reglas tácticas: ganar, bloquear o buscar una posición central.`
+          : `Minimax exploró el tablero y eligió la casilla ${m.lastDecision.index + 1}. Evaluación: ${m.lastDecision.score} (10: victoria de O, 0: empate, −10: victoria de X).`
       : m.gameId === "racing"
         ? `Choques: ${m.collisions}. Cada obstáculo reduce tu velocidad.`
         : "";

@@ -2,9 +2,9 @@
 
 Revisión realizada el 18 de noviembre de 2026, hora de Costa Rica.
 
-- 10 pruebas Node.js aprobadas: reglas de los tres juegos, aislamiento, fallos
+- 12 pruebas Node.js: reglas de los tres juegos, configuración, aislamiento, fallos
   de Prolog, API HTTP, reintentos y reconocimiento de duplicados.
-- 5 pruebas Prolog aprobadas, incluida exploración de todas las continuaciones
+- 10 pruebas Prolog, incluida exploración de todas las continuaciones
   legales del jugador para verificar que la estrategia de O no pierde.
 - Suite Go y go vet aprobados. Detector de carreras aprobado en Linux Docker.
 - 146 pruebas Scala aprobadas, incluyendo resumen vacío, partidas abiertas y

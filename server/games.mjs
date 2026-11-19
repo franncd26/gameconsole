@@ -56,7 +56,7 @@ export class Match {
       eventId: randomUUID(),
       timestamp: new Date().toISOString(),
       gameId: this.gameId,
-      gameVersion: "1.0",
+      gameVersion: "1.1",
       matchId: this.id,
       type,
       data,
@@ -113,15 +113,20 @@ export class TicTacToe extends Match {
     [0, 4, 8],
     [2, 4, 6],
   ];
-  constructor(emit, ai) {
+  constructor(emit, ai, { difficulty = "hard" } = {}) {
     super("tic-tac-toe", emit);
+    if (!["easy", "medium", "hard"].includes(difficulty))
+      throw new GameError(
+        "Selecciona una dificultad válida: baja, media o alta.",
+      );
+    this.difficulty = difficulty;
     this.players = ["human", "prolog"];
     this.board = Array(9).fill("");
     this.turn = 0;
     this.winningLine = [];
     this.ai = ai;
     this.lastDecision = null;
-    this.start({ symbols: { human: "X", prolog: "O" } });
+    this.start({ symbols: { human: "X", prolog: "O" }, difficulty });
   }
   place(index, symbol) {
     if (!Number.isInteger(index) || index < 0 || index > 8 || this.board[index])
@@ -162,7 +167,9 @@ export class TicTacToe extends Match {
         409,
       );
     if (this.state === "open") {
-      const decision = await this.ai(this.board);
+      const decision = await this.ai(this.board, {
+        difficulty: this.difficulty,
+      });
       if (
         !Number.isInteger(decision.index) ||
         this.board[decision.index] ||
@@ -174,7 +181,8 @@ export class TicTacToe extends Match {
       this.record(
         "AI_DECISION",
         {
-          algorithm: "minimax",
+          algorithm: decision.algorithm || "minimax",
+          difficulty: this.difficulty,
           index: decision.index,
           score: decision.score,
           board: [...this.board],
@@ -188,6 +196,7 @@ export class TicTacToe extends Match {
   snapshot() {
     return {
       ...super.snapshot(),
+      difficulty: this.difficulty,
       board: [...this.board],
       turn: this.turn,
       winningLine: this.winningLine,
@@ -197,19 +206,25 @@ export class TicTacToe extends Match {
 }
 const directions = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] };
 export class Snake extends Match {
-  constructor(emit, random = Math.random) {
+  constructor(emit, random = Math.random, { size = 20 } = {}) {
     super("snake", emit);
-    this.size = 20;
+    if (![12, 20, 28].includes(size))
+      throw new GameError(
+        "Selecciona una cuadrícula de 12, 20 o 28 casillas por lado.",
+      );
+    this.size = size;
+    const center = Math.floor(size / 2),
+      headX = Math.floor(size * 0.3);
     this.body = [
-      { x: 6, y: 10 },
-      { x: 5, y: 10 },
-      { x: 4, y: 10 },
+      { x: headX, y: center },
+      { x: headX - 1, y: center },
+      { x: headX - 2, y: center },
     ];
     this.direction = "right";
     this.points = 0;
     this.random = random;
     this.food = this.newFood();
-    this.start();
+    this.start({ gridSize: size });
   }
   newFood() {
     const free = [];

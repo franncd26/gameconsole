@@ -20,8 +20,20 @@ preference([4,0,2,6,8,1,3,5,7]).
 best_move(B,I,S) :- preference(Order),
     findall(V-J,(member(J,Order),move(B,'O',J,N),value(N,'X',V)),Options),
     findall(V,member(V-_,Options),Scores), max_list(Scores,S), member(S-I,Options), !.
+% Las tres dificultades deciden en Prolog, mediante reglas no aleatorias.
+% Baja aprovecha una victoria inmediata, pero no busca bloquear al rival.
+winning_move(B,P,I) :- move(B,P,I,N), winner(N,P), !.
+choose_move(B,easy,I,null,"reglas_basicas") :-
+    (winning_move(B,'O',I) -> true ; nth0(I,B,e)), !.
+% Media reconoce amenazas directas; puede fallar ante dobles amenazas.
+choose_move(B,medium,I,null,"reglas_tacticas") :-
+    (winning_move(B,'O',I) -> true ; winning_move(B,'X',I) -> true ;
+     nth0(4,B,e) -> I=4 ; nth0(I,B,e)), !.
+choose_move(B,hard,I,S,"minimax") :- best_move(B,I,S).
 main :- catch((json_read_dict(current_input,D), maplist(atom_string,B,D.board),
     length(B,9), maplist(valid_cell,B), \+ winner(B,'X'), \+ winner(B,'O'),
-    best_move(B,I,S), json_write_dict(current_output,_{index:I,score:S,algorithm:"minimax"}),nl),
+    (get_dict(difficulty,D,Level) -> atom_string(Difficulty,Level) ; Difficulty=hard),
+    choose_move(B,Difficulty,I,S,Algorithm),
+    json_write_dict(current_output,_{index:I,score:S,algorithm:Algorithm}),nl),
     _,halt(1)).
 valid_cell(e). valid_cell('X'). valid_cell('O').
