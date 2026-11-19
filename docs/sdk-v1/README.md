@@ -1,4 +1,4 @@
-# GameConsole SDK v1 — Fases 0–3C
+# GameConsole SDK v1 — Fases 0–3D.1
 
 Esta carpeta define el contrato para una evolución incremental. **Están
 implementados manifiestos, registro y la infraestructura local de carga confiable,
@@ -8,9 +8,10 @@ de datos/eventos/versiones de Fase 2B.2A y fachada dispatch JSON con historial
 acotado de Fase 2B.2B, y adaptador EventSink → EventOutbox con lotes de Fase 3A**.
 La [Fase 3C](phase-3c.md) añade bootstrap explícito de confianza y API optativa
 `/api/sdk/`, compartiendo el Outbox histórico. El equipo reporta PASSED del humo
-de transporte 3B contra Go/Scala; el nuevo humo HTTP continúa pendiente de
-ejecución manual. Las pruebas automatizadas usan fetcher simulado.
-El catálogo histórico conserva Gato, Snake y Circuito. No hay juegos migrados,
+de transporte 3B y HTTP 3C contra Go/Scala. Las pruebas automatizadas usan fetcher simulado.
+La [Fase 3D.1](phase-3d1-gato.md) migra el servidor de Gato a un paquete autónomo;
+su nuevo humo con Prolog/Go/Scala reales queda pendiente de ejecución manual.
+El catálogo histórico conserva Gato, Snake y Circuito. No hay web migrada,
 autenticación, iframe ni cargador web. Los fixtures no son un cuarto juego.
 
 - [Manifiesto normativo v1](manifest.md): campos, límites y reglas de archivos.
@@ -21,6 +22,7 @@ autenticación, iframe ni cargador web. Los fixtures no son un cuarto juego.
 - [Fase 2B.2B implementada](phase-2b2b.md): dispatch JSON, expectedVersion, replay e historial FIFO.
 - [Fase 3A implementada](phase-3a.md): OutboxEventSink, enqueueBatch, pruebas locales y humo manual pendiente.
 - [Fase 3C implementada](phase-3c.md): bootstrap confiable, rutas HTTP, límites y humo HTTP manual.
+- [Fase 3D.1 implementada](phase-3d1-gato.md): paquete autónomo Gato, reglas, IA Prolog y recuperación.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada

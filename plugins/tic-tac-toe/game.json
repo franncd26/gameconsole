@@ -1,0 +1,17 @@
+{
+  "manifestVersion": 1,
+  "sdkVersion": "1.0",
+  "id": "tic-tac-toe",
+  "name": "Gato",
+  "version": "1.1.0",
+  "description": "Gato contra inteligencia artificial en Prolog",
+  "category": "strategy",
+  "entrypoints": { "server": "server/index.mjs", "web": "web/index.html" },
+  "capabilities": { "pause": false, "resume": false, "multipleInstances": false, "ai": true },
+  "players": { "min": 2, "max": 2 },
+  "analytics": { "profile": "analytics/profile.json" },
+  "options": [
+    { "id": "difficulty", "label": "Dificultad", "type": "enum",
+      "values": ["easy", "medium", "hard"], "default": "hard" }
+  ]
+}
