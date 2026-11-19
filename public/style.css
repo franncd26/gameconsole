@@ -661,6 +661,7 @@ h1 > span {
   color: #f3b4c2;
 }
 .play-layout {
+  align-items: start;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 290px;
   gap: 24px;

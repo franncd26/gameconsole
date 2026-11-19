@@ -283,7 +283,19 @@ class GameConsole {
       for (const [label, key] of config) {
         const b = document.createElement("button");
         b.textContent = label;
-        b.setAttribute("aria-label", key);
+        b.setAttribute(
+          "aria-label",
+          {
+            left: "Izquierda",
+            right: "Derecha",
+            up: "Arriba",
+            down: "Abajo",
+            laneLeft: "Carril izquierdo",
+            laneRight: "Carril derecho",
+            gas: "Acelerar",
+            brake: "Frenar",
+          }[key],
+        );
         b.addEventListener("pointerdown", (e) => {
           e.preventDefault();
           b.setPointerCapture(e.pointerId);
