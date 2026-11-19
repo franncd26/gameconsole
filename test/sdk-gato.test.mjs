@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { cp, copyFile, mkdtemp, readFile, realpath, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -274,8 +275,13 @@ test('package imports remain inside its boundary; Prolog/tests/profile are exact
   for (const name of ['gato.pl', 'gato_tests.pl']) {
     assert.deepEqual(await readFile(new URL(`prolog/${name}`, original)), await readFile(new URL(`../prolog/${name}`, import.meta.url)));
   }
-  assert.deepEqual(await readFile(new URL('analytics/profile.json', original)),
-    await readFile(new URL('../.deps/gamestats/docs/examples/profiles/tic-tac-toe.json', import.meta.url)));
+  const profile = await readFile(new URL('analytics/profile.json', original));
+  // The audited Git blob uses LF; undo only checkout CRLF conversion (core.autocrlf).
+  // Preserve every other byte, including JSON whitespace, without parsing/reserializing.
+  const content = profile.filter((byte, index) => byte !== 13 || profile[index + 1] !== 10);
+  const blobSHA = createHash('sha1').update(`blob ${content.length}\0`).update(content).digest('hex');
+  assert.equal(blobSHA, 'b9020e08a4a02afa5c491c55b7e8a0c3ca0c5214',
+    'El perfil debe coincidir con el blob auditado de GameStats 4adee854.');
 });
 
 test('HTTP creates and plays the relocated authentic Gato package through generic SDK routes with a fake AI', async (t) => {
