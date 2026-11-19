@@ -28,10 +28,13 @@ export class GameSessionFactory {
     const controller = new AbortController();
     let phase = 'preparing';
     let forbiddenAttempt = false;
-    const unavailable = () => {
+    const unavailable = (event) => {
       if (phase === 'preparing') forbiddenAttempt = true;
+      if (phase !== 'preparing' && ['MATCH_STARTED', 'MATCH_FINISHED'].includes(event?.type)) {
+        throw new SDKError('RESERVED_EVENT', 'Los eventos de ciclo de vida pertenecen al anfitrión.');
+      }
       throw new SDKError(phase === 'preparing' ? 'EVENT_DURING_PREPARATION' : 'EVENTS_UNAVAILABLE',
-        'Eventos y solicitudes de cierre no están habilitados en Fase 2A.');
+        'Eventos de dominio y solicitudes de cierre del plugin no están habilitados en esta fase.');
     };
     const context = Object.freeze({
       gameId: manifest.id, gameVersion: manifest.version, matchId, players,
@@ -78,7 +81,16 @@ export class GameSessionFactory {
       return Object.freeze({
         matchId, manifest, options, players, startData,
         readData, dispose,
-        session: Object.freeze(Object.fromEntries(methods.map((key) => [key, session[key].bind(session)]))),
+        setLifecyclePhase(next) {
+          const allowed = { prepared: ['activating', 'closing'], activating: ['running', 'closing'], running: ['closing'] };
+          requireSDK(allowed[phase]?.includes(next), 'INVALID_LIFECYCLE', 'Transición interna de ciclo de vida inválida.');
+          phase = next;
+        },
+        session: Object.freeze(Object.fromEntries(methods.map((key) => [key, (...args) => {
+          requireSDK(!['closing', 'finished'].includes(phase), 'SESSION_CLOSED', 'La sesión ya no acepta operaciones del juego.');
+          requireSDK(phase !== 'activating', 'SESSION_NOT_ACTIVE', 'La activación aún no fue aceptada.');
+          return session[key](...args);
+        }]))),
       });
     } catch (error) {
       controller.abort();

@@ -1,18 +1,23 @@
 import { GameSessionFactory } from './session-factory.mjs';
+import { GameEventAdapter } from './event-adapter.mjs';
 import { copyJSON, requireSDK, SDKError } from './values.mjs';
 
-/** Phase 2A: preparation, inspection and cleanup only; no action/event runtime. */
+/** Local lifecycle only; no HTTP, public dispatch or domain-event coordinator. */
 export class GameInstanceManager {
   #factory;
   #instances = new Map();
   #pending = 0;
   #limit;
+  #acceptEvent;
 
-  constructor(factory, { limit = 500 } = {}) {
+  constructor(factory, { limit = 500, eventSink } = {}) {
     requireSDK(factory instanceof GameSessionFactory && Number.isInteger(limit) && limit >= 1 && limit <= 500,
       'INVALID_CONFIGURATION', 'Se requiere fábrica y límite entre 1 y 500.');
     this.#factory = factory;
     this.#limit = limit;
+    requireSDK(eventSink === undefined || typeof eventSink?.accept === 'function',
+      'INVALID_CONFIGURATION', 'EventSink debe implementar accept(event).');
+    this.#acceptEvent = eventSink?.accept.bind(eventSink);
   }
 
   get size() { return this.#instances.size; }
@@ -50,21 +55,78 @@ export class GameInstanceManager {
   #enqueue(matchId, operation) {
     const entry = this.#instances.get(matchId);
     if (!entry) return Promise.reject(new SDKError('UNKNOWN_MATCH', 'La partida no existe.'));
-    const next = entry.queue.then(() => operation(entry));
+    const next = entry.queue.then(() => {
+      requireSDK(this.#instances.get(matchId) === entry, 'UNKNOWN_MATCH', 'La preparación fue descartada.');
+      return operation(entry);
+    });
     entry.queue = next.catch(() => {});
     return next;
   }
 
   getSnapshot(matchId) {
     return this.#enqueue(matchId, async (entry) => {
-      if (entry.state === 'finished') return this.#snapshot(entry, entry.finalData);
-      entry.lastData = await entry.prepared.readData();
+      if (['closing', 'finished'].includes(entry.state)) return this.#snapshot(entry, entry.finalData);
+      await this.#read(entry);
       return this.#snapshot(entry, entry.lastData);
     });
   }
 
+  async #read(entry) {
+    const data = await entry.prepared.readData();
+    this.#snapshot(entry, data); // Validate the composed envelope before replacing the diagnostic copy.
+    entry.lastData = data;
+  }
+
   async list() {
     return Promise.all([...this.#instances.keys()].map((id) => this.getSnapshot(id)));
+  }
+
+  async #accept(event) {
+    requireSDK(this.#acceptEvent, 'EVENT_SINK_UNAVAILABLE', 'No se configuró un EventSink local.');
+    try { await this.#acceptEvent(event); }
+    catch { throw new SDKError('EVENT_ACCEPTANCE_FAILED', 'El EventSink no aceptó el evento localmente.'); }
+  }
+
+  #adapter(entry) {
+    const p = entry.prepared;
+    return new GameEventAdapter({ gameId: p.manifest.id, gameVersion: p.manifest.version,
+      matchId: p.matchId, players: p.players });
+  }
+
+  async #discard(entry, reason) {
+    requireSDK(entry.state === 'prepared', 'INVALID_LIFECYCLE', 'Solo se puede descartar una preparación no activada.');
+    entry.state = 'discarding';
+    try { await entry.prepared.dispose(reason); }
+    finally { this.#instances.delete(entry.prepared.matchId); }
+  }
+
+  discard(matchId) {
+    return this.#enqueue(matchId, (entry) => this.#discard(entry, 'preparation_discarded'));
+  }
+
+  activate(matchId) {
+    return this.#enqueue(matchId, async (entry) => {
+      if (entry.state === 'running') return this.#snapshot(entry, entry.lastData);
+      requireSDK(entry.state === 'prepared', 'INVALID_LIFECYCLE', 'La sesión no puede activarse en su estado actual.');
+      let runningSnapshot;
+      try {
+        entry.prepared.setLifecyclePhase('activating');
+        await this.#read(entry);
+        runningSnapshot = this.#snapshot({ ...entry, state: 'running' }, entry.lastData);
+        const event = this.#adapter(entry).createMatchStarted(entry.prepared.startData);
+        await this.#accept(event);
+      } catch (error) {
+        const failure = new SDKError('ACTIVATION_FAILED', 'No se aceptó el inicio; la preparación fue descartada.');
+        failure.failureCode = error instanceof SDKError ? error.code : 'INVALID_ACTIVATION';
+        try { await this.#discard(entry, 'activation_failed'); }
+        catch { failure.cleanupErrorCode = 'CLEANUP_FAILED'; }
+        throw failure;
+      }
+      // No plugin calls or awaits after acceptance: publication cannot fail in a hook.
+      entry.prepared.setLifecyclePhase('running');
+      entry.state = 'running';
+      return runningSnapshot;
+    });
   }
 
   finish(matchId, { reason = 'cancelled' } = {}) {
@@ -73,8 +135,25 @@ export class GameInstanceManager {
     }
     return this.#enqueue(matchId, async (entry) => {
       if (entry.state === 'finished') return this.#snapshot(entry, entry.finalData);
+      if (entry.state === 'running' || entry.state === 'closing') {
+        if (entry.state === 'running') {
+          try { await this.#read(entry); } catch (error) { entry.snapshotError = error; }
+          entry.finalData = entry.lastData;
+          entry.closeEvent = this.#adapter(entry).createMatchFinished({ reason });
+          entry.state = 'closing';
+          entry.prepared.setLifecyclePhase('closing');
+          try { await entry.prepared.dispose(reason); } catch (error) { entry.cleanupError = error; }
+        }
+        // Retain this exact envelope on rejection. The sink must reject without retaining it.
+        await this.#accept(entry.closeEvent);
+        entry.state = 'finished';
+        entry.version++;
+        if (entry.cleanupError) throw entry.cleanupError;
+        if (entry.snapshotError) throw entry.snapshotError;
+        return this.#snapshot(entry, entry.finalData);
+      }
       let snapshotError;
-      try { entry.lastData = await entry.prepared.readData(); } catch (error) { snapshotError = error; }
+      try { await this.#read(entry); } catch (error) { snapshotError = error; }
       entry.finalData = entry.lastData;
       // Terminal snapshot is an immutable report, not a second game-state engine.
       entry.state = 'finished';

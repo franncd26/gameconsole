@@ -1,5 +1,9 @@
 # Fase 2A — carga y preparación local, sin integración HTTP o GameStats
 
+Este documento conserva el alcance auditado de 2A. Las extensiones vigentes de
+activación/cierre, EventSink y contexto se describen en [Fase 2B.1](phase-2b1.md).
+Las interfaces de preparación se conservan; las diferencias están indicadas allí.
+
 Se implementan carga confiable, opciones, preparación declarativa y administración
 de sesiones preparadas. No se activa el runtime de acciones ni se emiten eventos.
 El servidor histórico no importa estos módulos. La UI y los tres juegos siguen

@@ -1,9 +1,10 @@
-# Runtime SDK 1.0 — contrato diseñado, pendiente de implementación
+# Runtime SDK 1.0 — estado implementado y contrato objetivo
 
 Este documento describe el runtime objetivo. La [Fase 2A](phase-2a.md) concreta e
 implementa carga confiable, opciones, preparación y administración local de
-sesiones preparadas. La activación con eventos, acciones públicas y coordinador
-de transiciones siguen siendo diseño para fases posteriores. El registro
+sesiones preparadas. La [Fase 2B.1](phase-2b1.md) añade activación y cierre con un
+EventSink local. Acciones públicas, eventos de dominio y coordinador de
+transiciones siguen siendo diseño para fases posteriores. El registro
 continúa almacenando solo metadatos, separado del loader y la fábrica.
 Las rutas HTTP, clases actuales, UI y EventOutbox mantienen su comportamiento.
 
@@ -59,7 +60,8 @@ recursos o limpia su estado. Terminar por reglas se solicita con `finishMatch`.
 
 Protocolo objetivo obligatorio. Los pasos de preparación y validación están
 implementados en 2A según el descriptor exacto de [phase-2a.md](phase-2a.md); la
-construcción/entrega de MATCH_STARTED y la activación del paso 5 siguen pendientes:
+construcción de MATCH_STARTED y la activación local del paso 5 se implementan en
+2B.1. La entrega real a Go y habilitación de acciones/dominio siguen pendientes:
 
 1. El host valida opciones, asigna identidad y valida participantes contra
    `manifest.players` y `GamePlugin.initializationContract`. Esta declaración del
@@ -86,6 +88,8 @@ construcción/entrega de MATCH_STARTED y la activación del paso 5 siguen pendie
    en `running`, versión pública inicial `0`, y habilita acciones y eventos de
    dominio. La primera transición posterior confirmada incrementa la versión.
    El transporte remoto no tiene que haber entregado el evento para habilitarla.
+   En 2B.1 solo se habilita el ciclo de vida running; las acciones y eventos de
+   dominio permanecerán deshabilitados hasta su coordinador en 2B.2.
 
 Cualquier fallo antes de aceptar el inicio impide publicar la instancia y emitir
 eventos de dominio; el host limpia la sesión preparada con `finish` en modo de
@@ -199,11 +203,12 @@ de la operación para no esperar recursivamente la misma cola; la limpieza
 `session.finish` no volverá a llamar a `finishMatch`. El protocolo detallado de
 errores de limpieza y aceptación de eventos queda por implementar con el runtime.
 
-Un Adapter futuro construirá el sobre existente de GameStats sin cambiarlo:
+El Adapter de 2B.1 construye el sobre existente de GameStats sin cambiarlo:
 `schemaVersion: 1`, `eventId`, `timestamp`, `gameId`, `matchId`, `type`, `data`,
-y opcionalmente `gameVersion`, `playerId`. El host asignará ID de evento, tiempo
-UTC e identidad, conservará orden por partida y delegará entrega/reintentos en
-EventOutbox. No se envía el acumulado como si fuera incremento. Aceptación local
+y opcionalmente `playerId` (el SDK incluye `gameVersion`). El host asigna ID de evento,
+tiempo UTC e identidad y conserva orden por partida. La entrega/reintentos mediante
+EventOutbox siguen pendientes: por ahora solo se prueba un EventSink en memoria.
+No se envía el acumulado como si fuera incremento. Aceptación local
 no equivale a entrega exactamente una vez; no se añade persistencia durable.
 
 Go seguirá validando y organizando eventos; Scala seguirá calculando estadísticas.
@@ -232,9 +237,9 @@ entregar exactamente tres juegos funcionales. Los fixtures quedan fuera de
 | Patrón | Decisión | Estado en esta fase |
 | --- | --- | --- |
 | Registry + Factory | El registro descubre identidades y metadatos sin condiciones por `gameId`; una fábrica separada prepara cada sesión. Evita acoplar catálogo y reglas. | Registry, Loader y preparación de Factory implementados en 2A. |
-| Adapter | Convierte hechos de dominio al sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Futuro; no se modifica EventOutbox. |
+| Adapter | Construye el sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Ciclo de vida y construcción pura implementados en 2B.1; publicación de dominio y conexión EventOutbox pendientes. |
 | Observer | El host observa hechos emitidos por la sesión y desacopla reglas de consumidores como transporte o UI. | Futuro; sin bus nuevo. |
-| State | Ciclo running/paused/finished centralizado para evitar que cada plugin redefina transiciones comunes. | Futuro; 2A solo administra prepared/finished locales. Ninguna clase actual se reescribe. |
+| State | Ciclo de vida centralizado para evitar que cada plugin redefina transiciones comunes. | prepared/running/closing/finished implementados para ciclo de vida local; pausa y transiciones de dominio pendientes. Ninguna clase actual se reescribe. |
 | Dependency Injection | Contexto y servicios por sesión permiten límites explícitos y sustituciones en pruebas. | Contexto mínimo de 2A implementado; servicios y eventos siguen pendientes. |
 | Facade | Una interfaz del host para catálogo, sesiones y consultas GameStats evita que web/plugins coordinen servicios internos. | Catálogo y manager de preparación/lectura/cierre implementados; integración GameStats futura. |
 
