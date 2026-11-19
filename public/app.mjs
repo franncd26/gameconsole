@@ -559,23 +559,47 @@ class GameConsole {
       const r = await api("/matches/" + id + "/results");
       if (this.current?.id !== id) return;
       $("#match-results").innerHTML =
+        `<p>${r.state === "open" ? "Resultados provisionales" : "Resultados finales"}</p>` +
         r.metrics
-          .filter((m) => m.scope === "match" || m.subjectId === "human")
           .map((m) =>
             this.metric(
-              m.label,
-              typeof m.value === "object" && m.value !== null
-                ? m.value.outcome === "win"
-                  ? "Victoria"
-                  : m.value.outcome === "draw"
-                    ? "Empate"
-                    : "En curso"
-                : m.value == null
-                  ? "Pendiente"
-                  : this.number(m.value) + (m.unit === "seconds" ? " s" : ""),
+              m.label +
+                (m.scope === "player"
+                  ? ` · ${m.subjectId === "human" ? "Tú" : m.subjectId === "prolog" ? "Prolog" : m.subjectId}`
+                  : ""),
+              m.status === "invalid"
+                ? "Datos inválidos"
+                : typeof m.value === "object" && m.value !== null
+                  ? m.value.outcome === "win"
+                    ? m.value.winnerId === "human"
+                      ? "Ganaste"
+                      : "Gana Prolog"
+                    : m.value.outcome === "draw"
+                      ? "Empate"
+                      : "En curso"
+                  : m.value == null
+                    ? "Pendiente"
+                    : this.number(m.value) +
+                      (m.unit === "seconds"
+                        ? " s"
+                        : m.unit === "ms"
+                          ? " ms"
+                          : ""),
             ),
           )
-          .join("") || "Sin métricas disponibles.";
+          .join("") +
+        r.patterns
+          .map((p) =>
+            this.metric(
+              p.label,
+              p.status === "invalid"
+                ? "Datos inválidos"
+                : p.count == null
+                  ? "Pendiente"
+                  : p.count,
+            ),
+          )
+          .join("");
     } catch {
       if (this.current?.id === id)
         $("#match-results").textContent =
