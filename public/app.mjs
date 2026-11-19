@@ -165,6 +165,10 @@ class GameConsole {
   }
   async finish() {
     if (!this.current) return;
+    this.paused = true;
+    this.keys.clear();
+    this.touchAccelerate = false;
+    this.touchBrake = false;
     try {
       const id = this.current.id;
       const m = await api("/matches/" + id + "/finish", "POST", {});
@@ -184,20 +188,22 @@ class GameConsole {
     const id = this.current.id;
     try {
       const m = await api("/matches/" + id + "/action", "POST", data);
-      if (this.current?.id === id) {
+      if (this.current?.id === id && m.version >= this.current.version) {
         this.current = m;
         this.render();
       }
     } catch (e) {
       this.paused = true;
-      notice(e.message);
       try {
         const m = await api("/matches/" + id);
-        if (this.current?.id === id) {
+        if (this.current?.id === id && m.version >= this.current.version) {
           this.current = m;
           this.render();
+          if (m.state === "open") notice(e.message);
         }
-      } catch {}
+      } catch {
+        notice(e.message);
+      }
     } finally {
       this.busy = false;
     }
