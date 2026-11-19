@@ -1,0 +1,6 @@
+{
+  "name": "gameconsole", "version": "1.0.0", "private": true, "type": "module",
+  "description": "Consola de tres juegos con POO, Prolog y GameStats",
+  "engines": {"node": ">=22"},
+  "scripts": {"start": "node server/index.mjs", "test": "node --test test/*.test.mjs", "test:integration": "node scripts/integration.mjs", "check": "node --check server/index.mjs && node --check public/app.mjs"}
+}

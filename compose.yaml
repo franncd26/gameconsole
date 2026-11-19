@@ -1,0 +1,42 @@
+name: gameconsole
+services:
+  scala-analysis:
+    image: gameconsole-gamestats-scala:local
+    build:
+      context: ${GAMESTATS_SOURCE:-./.deps/gamestats}
+      dockerfile: scala-analysis/Dockerfile
+    environment:
+      SCALA_HOST: 0.0.0.0
+      SCALA_PORT: "9000"
+      SCALA_PROFILES_DIR: /app/profiles
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  go-ingestion:
+    image: gameconsole-gamestats-go:local
+    build:
+      context: ${GAMESTATS_SOURCE:-./.deps/gamestats}
+      dockerfile: go-ingestion/Dockerfile
+    environment:
+      SCALA_SERVICE_URL: http://scala-analysis:9000
+    ports: ["127.0.0.1:${GAMESTATS_PORT:-8080}:8080"]
+    depends_on:
+      scala-analysis: {condition: service_healthy}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  gameconsole:
+    image: gameconsole:local
+    build: .
+    environment:
+      GAMESTATS_URL: http://go-ingestion:8080
+    ports: ["127.0.0.1:${PORT:-3000}:3000"]
+    depends_on:
+      go-ingestion: {condition: service_healthy}
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 12s

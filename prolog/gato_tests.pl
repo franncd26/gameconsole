@@ -1,0 +1,13 @@
+:- consult(gato).
+:- begin_tests(gato).
+test(win_now) :- best_move(['O','O',e,'X','X',e,'X',e,e],2,10).
+test(block_loss) :- best_move(['X','X',e,e,'O',e,e,e,e],2,_).
+test(center) :- best_move(['X',e,e,e,e,e,e,e,e],4,0).
+test(forced_draw) :- best_move(['X','O','X','X','O',e,'O','X',e],_,0).
+% Exhaust every legal human continuation: optimal O never loses.
+safe(B) :- winner(B,'O'), !.
+safe(B) :- \+ member(e,B), !.
+safe(B) :- forall(move(B,'X',_,N), (\+ winner(N,'X'),
+    (\+ member(e,N) -> true ; best_move(N,I,_),move(N,'O',I,Next),safe(Next)))).
+test(never_loses_all_human_paths) :- safe([e,e,e,e,e,e,e,e,e]).
+:- end_tests(gato).
