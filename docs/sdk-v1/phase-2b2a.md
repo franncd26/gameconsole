@@ -1,5 +1,21 @@
 # Fase 2B.2A — protocolo de confirmación local
 
+## Correcciones de auditoría: cierre condicionado y una confirmación pendiente
+
+El cierre automático anterior atendía toda intención registrada sin comprobar el
+resultado final de la operación; podía emitir MATCH_FINISHED después de rechazar
+una transición. Ahora solo se ejecuta si la operación termina sin errores ni
+confirmaciones rechazadas y su resultado no es rejected ni dependency_failed.
+Una intención registrada no confirma por sí sola el fin de la partida.
+
+La secuencia interna anterior ordenaba propuestas ya calculadas, pero no impedía
+que dos usaran el mismo estado anterior. Ahora solo se permite una confirmación
+pendiente por operación. Una segunda se rechaza con CONCURRENT_TRANSITION antes
+de validarla/enviarla, y el fallo queda registrado aunque el plugin lo capture.
+La primera puede terminar y confirmarse; no se revierte ni cancela un evento ya
+aceptado. El fallo bloquea más confirmaciones y el cierre automático de esa
+operación. Otra operación explícita puede continuar desde el estado vigente.
+
 ## Decisión previa a la implementación
 
 `EventSink.accept(event)` de 2B.1 no permite aceptar atómicamente dos eventos:
@@ -49,14 +65,18 @@ la referencia. No hay un segundo motor de reglas ni una copia mutable paralela.
    dependencia falla después del recibo, las confirmaciones anteriores permanecen;
    el resultado de la operación incluye error saneado y snapshot vigente. Continuar
    exige otra operación explícita que lea el estado pendiente, sin repetir lo ya
-   confirmado. No hay rollback implícito ni deduplicación de acciones todavía.
+   confirmado. Una intención de cierre queda cancelada si la operación falla;
+   la partida permanece running. No hay rollback implícito ni deduplicación de
+   acciones todavía.
 
 El host ejecutará la operación por la cola de la partida mediante una entrada
 interna para código confiable, no un endpoint dispatch. Dentro de la operación,
-las confirmaciones tienen su propia secuencia directa: no esperan recursivamente
-la cola exterior. Una solicitud `context.finishMatch({reason})` solo registra una
+las confirmaciones tienen su propia secuencia directa y como máximo una pendiente:
+no esperan recursivamente la cola exterior. Una solicitud `context.finishMatch({reason})` solo registra una
 intención y confirma esa recepción; el cierre real se procesa al salir de la
-operación, después de drenar confirmaciones. No espera su propia operación.
+operación, después de drenar la confirmación pendiente y comprobar su éxito.
+Si hay errores o resultado rejected/dependency_failed, se descarta la intención
+sin generar MATCH_FINISHED ni limpiar la sesión. No espera su propia operación.
 
 Las confirmaciones de una operación se detienen al primer error, incluso si el
 plugin lo captura. Una operación puede tener un prefijo de **transiciones** ya
@@ -108,8 +128,11 @@ coincidir con él. Desde entonces los snapshots del host leen esa celda canónic
 sin otra copia mutable de dominio ni llamadas al plugin después de aceptar un
 evento. `read()` devuelve la referencia inmutable, por lo que un valor leído antes
 de confirmar no se actualiza mágicamente: el plugin debe volver a leer. Se debe
-esperar cada recibo antes de derivar otro candidato del estado actualizado. No hay
-mezcla automática de candidatos calculados en paralelo ni reglas de juego en JS
+esperar cada recibo antes de derivar otro candidato del estado actualizado. El host
+rechaza una segunda solicitud mientras la primera está pendiente, incluso si
+ambas se hacen inmediatamente, antes de que el sink reciba la primera. El indicador
+de pendiente se libera al completarse/rechazarse la promesa, antes de entregar su
+resultado al plugin. No hay mezcla automática de candidatos paralelos ni reglas de juego en JS
 del anfitrión. Las opciones, identidad y participantes mantienen las protecciones
 de 2A; los campos del sobre de identidad nunca se toman del candidato. Un campo
 homónimo dentro de data no sustituye la identidad asignada por el anfitrión.
@@ -140,7 +163,8 @@ produce INVALID_OPERATION_RESULT, conservando cualquier confirmación anterior. 
 clasificación genérica de una excepción es PLUGIN_OPERATION_FAILED (no se intenta
 inferir si era Prolog u otro servicio). Si el plugin declara rejected después de
 confirmar, se informa INVALID_OPERATION_RESULT y se conserva lo confirmado.
-Una acción inválida debe retornar rejected **antes** de confirmar o solicitar fin.
+Una acción inválida debe retornar rejected **antes** de confirmar. Si antes había
+registrado una intención de fin, ese resultado la cancela: no es un cierre confirmado.
 
 Un fallo de validación/sink sin confirmaciones produce rejected/committed false.
 Si ya hubo confirmaciones, el fallo produce dependency_failed/committed true.
@@ -153,9 +177,12 @@ reintenta la acción completa de manera implícita.
 ## Secuenciación, cierre y compatibilidad
 
 Las operaciones usan la cola por instancia de 2A/2B.1. Dentro de una operación las
-confirmaciones pasan por una secuencia interna; las propuestas se copian al
-recibirlas. El host drena también las confirmaciones enviadas sin await antes de
-resolver la operación. No se habilitan timers o publicaciones espontáneas:
+confirmaciones pasan por una secuencia interna, con una sola confirmación pendiente;
+las propuestas admitidas se copian al recibirlas. Las segundas solicitudes
+simultáneas no se encolan. El host drena también una confirmación única enviada
+sin await antes de resolver la operación; esto no habilita enviar otra sin esperar
+la anterior. Varias confirmaciones secuenciales correctamente esperadas siguen
+siendo válidas. No se habilitan timers o publicaciones espontáneas:
 AsyncLocalStorage vincula confirmaciones/solicitudes de fin al alcance activo de
 esa operación. Un contexto asíncrono que sobrevive a ella pierde esa capacidad.
 
@@ -168,16 +195,23 @@ la operación, incluso si se está esperando una dependencia externa.
 
 La primera solicitud de cierre guarda el motivo; solicitudes posteriores no lo
 sustituyen. Una confirmación solicitada después de esa intención se rechaza con
-CLOSE_REQUESTED. Las que ya estaban encoladas se drenan antes del cierre. Al salir
-se ejecuta el mismo cierre de 2B.1 directamente, sin reenviar la operación a su
-propia cola. El cierre aumenta otra vez la versión solo cuando su evento se acepta.
+CLOSE_REQUESTED. La confirmación que ya estaba pendiente se drena antes de decidir
+si cerrar. Al salir se ejecuta el mismo cierre de 2B.1 directamente **solo si no hay
+errores ni confirmaciones rechazadas y el resultado no es rejected o
+dependency_failed**. En cualquier otro caso se descarta la intención para esa
+operación: no hay MATCH_FINISHED, limpieza ni cambio de ciclo de vida, y no se
+arrastra la intención a operaciones posteriores. Se conservan las versiones y
+datos de las transiciones ya confirmadas; la partida permanece running y admite
+un cierre explícito posterior con manager.finish(). El cierre exitoso no reenvía
+la operación a su propia cola y aumenta la versión solo cuando su evento se acepta.
 No se publican eventos después de MATCH_FINISHED.
 
 Si el sink rechaza el cierre, el resultado incluye error y snapshot closing,
 conservando las versiones de dominio confirmadas. Un `manager.finish` posterior
-reintenta el mismo sobre, tal como en 2B.1. Un error de cierre/limpieza tiene
-prioridad en el campo error sobre uno de dominio; confirmations y snapshot siguen
-mostrando lo realmente confirmado. Ningún error deshace el estado anterior.
+reintenta el mismo sobre, tal como en 2B.1. Este caso ocurre después de una operación
+exitosa que sí podía cerrar. El resultado informa el error de cierre/limpieza;
+confirmations y snapshot siguen mostrando lo realmente confirmado. Ningún error
+deshace el estado anterior.
 
 Sin celda optativa, create/activate/getSnapshot/finish/discard siguen funcionando
 como en 2A/2B.1, con sus mismas pruebas. Solo runOperation se rechaza con
@@ -193,6 +227,21 @@ El fixture `test/fixtures/sdk-transitions/plugin.mjs` es código ficticio: sus
 pruebas ensamblan paquetes temporales usando el manifiesto de prueba existente.
 No es Gato, no usa Prolog y no se instala en plugins/. El mock confirma MOVE_PLACED,
 marca IA pendiente, falla y permite RETRY_AI sin repetir el movimiento humano.
+
+Las regresiones de auditoría cubren intención de cierre tras una confirmación
+sin await rechazada, intención anterior a confirmación inválida, resultados
+rejected/dependency_failed, y fallo externo tras una transición confirmada. Todos
+conservan running sin cierre automático. La prueba previa CLOSE_THEN_CONFIRM se
+actualiza deliberadamente: esperar finished en ese caso contradice el nuevo
+contrato, porque CLOSE_REQUESTED es un fallo de confirmación. El cierre exitoso
+CLOSE y la idempotencia explícita mantienen su comportamiento.
+
+Dos incrementos derivados del mismo contador se prueban tanto con solicitudes
+inmediatas como con la primera detenida en el sink. Solo la primera puede
+confirmarse; se comprueban eventos aceptados, datos, versión y el error persistente
+CONCURRENT_TRANSITION. También se comprueba conservación de un prefijo confirmado,
+rechazo del sink, confirmación única sin await y varias confirmaciones esperadas.
+No se cambia acceptBatch ni la semántica de sus pruebas.
 
 El sink ficticio con lotes prepara todos los eventos en un buffer privado y solo
 entonces los agrega a su colección aceptada. Una prueba fuerza un fallo en el

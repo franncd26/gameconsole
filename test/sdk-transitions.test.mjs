@@ -294,15 +294,146 @@ test('cierre solicitado y esperado dentro de acción no bloquea; nunca hay event
   assert.equal(sink.events.length, 3);
 });
 
-test('confirmar después de solicitar cierre se rechaza antes del sink y el cierre no se duplica', async (t) => {
-  const { sink, activate, run } = await setup(t);
+test('confirmar después de solicitar cierre falla y cancela la intención de cierre automático', async (t) => {
+  const { manager, prepared, sink, activate, run } = await setup(t);
   await activate();
   const result = await run('CLOSE_THEN_CONFIRM');
   assert.equal(result.error.code, 'CLOSE_REQUESTED');
   assert.equal(result.committed, false);
-  assert.equal(result.snapshot.state, 'finished');
-  assert.equal(result.snapshot.version, 1);
+  assert.equal(result.snapshot.state, 'running');
+  assert.equal(result.snapshot.version, 0);
+  assert.equal(result.snapshot.data.count, 0);
+  assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED']);
+  await manager.finish(prepared.matchId);
+  await manager.finish(prepared.matchId);
   assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED', 'MATCH_FINISHED']);
+});
+
+test('confirmación sin await rechazada por el sink impide el cierre solicitado', async (t) => {
+  const { manager, prepared, probe, sink, activate, run } = await setup(t);
+  await activate();
+  sink.failType = 'COUNT_CHANGED';
+  const result = await run('UNAWAITED_CLOSE');
+  assert.equal(result.error.code, 'EVENT_ACCEPTANCE_FAILED');
+  assert.equal(result.committed, false);
+  assert.equal(result.confirmations, 0);
+  assert.equal(result.snapshot.state, 'running');
+  assert.equal(result.snapshot.version, 0);
+  assert.equal(result.snapshot.data.count, 0);
+  assert.equal(probe.probes.get(prepared.matchId).context.signal.aborted, false);
+  assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED']);
+  await manager.finish(prepared.matchId);
+  assert.equal((await manager.getSnapshot(prepared.matchId)).state, 'finished');
+  assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED', 'MATCH_FINISHED']);
+});
+
+test('resultados rejected o dependency_failed cancelan la intención de cerrar', async (t) => {
+  const { manager, prepared, sink, activate, run } = await setup(t);
+  await activate();
+  for (const [type, outcome] of [['CLOSE_REJECTED', 'rejected'], ['CLOSE_DEPENDENCY_FAILED', 'dependency_failed']]) {
+    const result = await run(type);
+    assert.equal(result.outcome, outcome);
+    assert.equal(result.committed, false);
+    assert.equal(result.snapshot.state, 'running');
+    assert.equal(result.snapshot.version, 0);
+    assert.equal(result.snapshot.data.count, 0);
+    assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED']);
+  }
+  // Failed-operation intentions expire: they do not close a later successful operation.
+  assert.equal((await run('SILENT')).snapshot.state, 'running');
+  await manager.finish(prepared.matchId);
+  assert.equal(sink.events.filter((event) => event.type === 'MATCH_FINISHED').length, 1);
+});
+
+test('fallo externo tras confirmar conserva la transición sin ejecutar el cierre solicitado', async (t) => {
+  const { manager, prepared, probe, sink, activate, run } = await setup(t);
+  await activate();
+  const result = await run('CONFIRMED_FAILED_CLOSE');
+  assert.equal(result.outcome, 'dependency_failed');
+  assert.equal(result.error.code, 'PLUGIN_OPERATION_FAILED');
+  assert.equal(result.committed, true);
+  assert.equal(result.confirmations, 1);
+  assert.equal(result.snapshot.state, 'running');
+  assert.equal(result.snapshot.version, 1);
+  assert.equal(result.snapshot.data.count, 1);
+  assert.equal(probe.probes.get(prepared.matchId).context.signal.aborted, false);
+  assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED', 'COUNT_CHANGED']);
+  const closed = await manager.finish(prepared.matchId);
+  assert.equal(closed.version, 2);
+  assert.equal(closed.data.count, 1);
+  await manager.finish(prepared.matchId);
+  assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED', 'COUNT_CHANGED', 'MATCH_FINISHED']);
+});
+
+test('confirmaciones simultáneas del mismo contador no aceptan dos eventos para un solo incremento', async (t) => {
+  const { manager, prepared, sink, activate, run } = await setup(t);
+  await activate();
+  for (const prefix of [false, true]) {
+    const before = await manager.getSnapshot(prepared.matchId);
+    const eventCount = sink.events.length;
+    const result = await run('CONCURRENT', { prefix });
+    const confirmed = prefix ? 2 : 1;
+    assert.equal(result.error.code, 'CONCURRENT_TRANSITION');
+    assert.equal(result.outcome, 'dependency_failed');
+    assert.equal(result.committed, true);
+    assert.equal(result.confirmations, confirmed);
+    assert.equal(result.snapshot.state, 'running'); // Catching the exception cannot enable automatic closure.
+    assert.equal(result.snapshot.version, before.version + confirmed);
+    assert.equal(result.snapshot.data.count, before.data.count + confirmed);
+    const accepted = sink.events.slice(eventCount);
+    assert.equal(accepted.length, confirmed);
+    assert.ok(accepted.every((event) => event.type === 'COUNT_CHANGED' && event.data.delta === 1));
+    assert.equal(accepted.reduce((sum, event) => sum + event.data.delta, 0), result.snapshot.data.count - before.data.count);
+  }
+  const beforeFailure = await manager.getSnapshot(prepared.matchId);
+  const acceptedCount = sink.events.length;
+  sink.failType = 'COUNT_CHANGED';
+  const rejected = await run('CONCURRENT');
+  assert.equal(rejected.error.code, 'CONCURRENT_TRANSITION');
+  assert.equal(rejected.confirmations, 0);
+  assert.equal(rejected.committed, false);
+  assert.deepEqual(rejected.snapshot, beforeFailure);
+  assert.equal(sink.events.length, acceptedCount);
+});
+
+test('confirmación ya pendiente en el sink se conserva al rechazar otra propuesta simultánea', { timeout: 5000 }, async (t) => {
+  const { manager, prepared, probe, sink, activate } = await setup(t);
+  await activate();
+  let entered, release;
+  const started = new Promise((resolve) => { entered = resolve; });
+  const gate = new Promise((resolve) => { release = resolve; });
+  sink.beforeAccept = async (event) => { if (event.type === 'COUNT_CHANGED') { entered(); await gate; } };
+  let rejectedCode;
+  const operation = manager.runOperation(prepared.matchId, async () => {
+    const state = probe.probes.get(prepared.matchId);
+    const candidate = { data: { ...state.read(), count: state.read().count + 1 },
+      events: [{ type: 'COUNT_CHANGED', data: { delta: 1 } }] };
+    const first = state.context.confirmTransition(candidate);
+    await started;
+    try { await state.context.confirmTransition(candidate); } catch (error) { rejectedCode = error.code; }
+    release();
+    await first;
+  });
+  const result = await operation;
+  assert.equal(rejectedCode, 'CONCURRENT_TRANSITION');
+  assert.equal(result.error.code, 'CONCURRENT_TRANSITION');
+  assert.equal(result.confirmations, 1);
+  assert.equal(result.snapshot.version, 1);
+  assert.equal(result.snapshot.data.count, 1);
+  assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED', 'COUNT_CHANGED']);
+});
+
+test('varias confirmaciones secuenciales esperadas continúan confirmando incrementos completos', async (t) => {
+  const { sink, activate, run } = await setup(t);
+  await activate();
+  const result = await run('TWO_TRANSITIONS');
+  assert.equal(result.outcome, 'completed');
+  assert.equal(result.error, undefined);
+  assert.equal(result.confirmations, 2);
+  assert.equal(result.snapshot.state, 'running');
+  assert.equal(result.snapshot.version, 2);
+  assert.equal(result.snapshot.data.count, 2);
+  assert.deepEqual(sink.events.map((event) => event.type), ['MATCH_STARTED', 'COUNT_CHANGED', 'SECOND_EVENT']);
 });
 
 test('rechazo de cierre solicitado durante operación conserva confirmaciones y política closing de 2B.1', async (t) => {

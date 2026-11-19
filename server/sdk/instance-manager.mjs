@@ -186,11 +186,21 @@ export class GameInstanceManager {
       let failure;
       let operationFailed = false;
       let confirmations = 0;
+      let confirmationPending = false;
       let finishReason;
       let tail = Promise.resolve();
       const errorInfo = (error) => ({ code: error.code, message: error.message });
       const bridge = {
         confirm: (input) => {
+          if (confirmationPending) {
+            const error = new SDKError('CONCURRENT_TRANSITION', 'Debe completar la confirmación pendiente antes de solicitar otra.');
+            failure ??= error;
+            const rejected = Promise.reject(error);
+            rejected.catch(() => {}); // The operation records the failure even if the plugin ignores this promise.
+            return rejected;
+          }
+          const priorFailure = failure;
+          confirmationPending = true;
           let proposal, inputError;
           try {
             requireSDK(accepting, 'OPERATION_ENDED', 'La operación ya terminó.');
@@ -198,7 +208,7 @@ export class GameInstanceManager {
             proposal = copyJSON(input, 'INVALID_TRANSITION');
           } catch (error) { inputError = error; }
           const next = tail.then(async () => {
-            if (failure) throw failure;
+            if (priorFailure) throw priorFailure;
             if (inputError) throw inputError;
             requireSDK(entry.state === 'running' && isObject(proposal)
               && Object.keys(proposal).length === 2 && Object.hasOwn(proposal, 'data')
@@ -219,7 +229,7 @@ export class GameInstanceManager {
             entry.version++;
             confirmations++;
             return { version: entry.version, snapshot };
-          });
+          }).finally(() => { confirmationPending = false; });
           tail = next.catch((error) => {
             const codes = ['INVALID_TRANSITION', 'VERSION_LIMIT', 'INVALID_EVENT', 'RESERVED_EVENT',
               'INVALID_EVENT_PLAYER', 'EVENT_TOO_LARGE', 'BATCH_SINK_REQUIRED', 'EVENT_SINK_UNAVAILABLE',
@@ -265,7 +275,7 @@ export class GameInstanceManager {
           failure ??= new SDKError('INVALID_OPERATION_RESULT', 'Una operación confirmada no puede declararse rechazada.');
         }
         let closeError;
-        if (finishReason !== undefined) {
+        if (finishReason !== undefined && !failure && !operationFailed && outcome !== 'rejected') {
           try { await this.#finishEntry(entry, finishReason); }
           catch (error) { closeError = error; }
         }

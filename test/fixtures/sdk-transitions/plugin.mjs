@@ -65,6 +65,30 @@ export default {
               await context.finishMatch({ reason: 'completed' });
               await add(1, [countEvent(1)]);
               break;
+            case 'UNAWAITED_CLOSE':
+              add(1, [countEvent(1)]);
+              await context.finishMatch({ reason: 'completed' });
+              break;
+            case 'CLOSE_REJECTED':
+              await context.finishMatch({ reason: 'completed' });
+              return { outcome: 'rejected' };
+            case 'CLOSE_DEPENDENCY_FAILED':
+              await context.finishMatch({ reason: 'completed' });
+              return { outcome: 'dependency_failed' };
+            case 'CONFIRMED_FAILED_CLOSE':
+              await add(1, [countEvent(1)]);
+              await context.finishMatch({ reason: 'completed' });
+              await dependency();
+              break;
+            case 'CONCURRENT': {
+              if (payload.prefix) await add(1, [countEvent(1)]);
+              const first = add(1, [countEvent(1)]);
+              try { await add(1, [countEvent(1)]); } catch { /* Catching must not hide concurrency from the host. */ }
+              await first;
+              try { await add(1, [countEvent(1)]); } catch { /* The operation remains failed after the first settles. */ }
+              await context.finishMatch({ reason: 'completed' });
+              break;
+            }
             case 'UNAWAITED':
               add(1, [countEvent(1)]);
               break;
