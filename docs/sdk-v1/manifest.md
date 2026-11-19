@@ -58,10 +58,11 @@ permitidos y obligatorios dependen exclusivamente del tipo:
 No hay referencias, callbacks, validadores ejecutables, objetos anidados,
 expresiones regulares configurables, URLs ni secretos. Los campos propios de un
 tipo se rechazan en los otros tipos. Los defaults permiten un formulario futuro
-genérico. Esta fase valida **la declaración y los defaults**, no implementa el
-formulario ni la validación de opciones recibidas al crear partidas. En el diseño
-futuro el host aplicará defaults a campos omitidos, rechazará claves desconocidas
-y valores fuera de límites sin coerción, y entregará una copia al plugin.
+genérico. El validador de manifiestos comprueba **la declaración y los defaults**.
+En Fase 2A, `validateOptions` y la fábrica también validan las opciones recibidas:
+aplican defaults a campos omitidos, rechazan claves desconocidas y valores fuera
+de límites sin coerción, y entregan una copia congelada al plugin. No se implementa
+el formulario web ni la creación desde HTTP; véase [Fase 2A](phase-2a.md).
 
 Ejemplo de tamaños discretos de Snake, sin instalar ni migrar ese juego:
 
@@ -114,5 +115,6 @@ analítico solo se localiza: no se valida su contenido ni se registra en Go/Scal
 El directorio configurado y los paquetes deben permanecer estables durante la
 inspección. La validación de rutas no constituye sandbox contra modificaciones
 concurrentes del sistema de archivos (TOCTOU), ni un mecanismo de confianza para
-ejecutar plugins de terceros. Antes de un futuro cargador habrá que decidir esa
-política. Ninguna de estas comprobaciones autoriza ejecutar el plugin ahora.
+ejecutar plugins de terceros. Estas comprobaciones no autorizan ejecutar el plugin:
+el [loader de Fase 2A](phase-2a.md) requiere además una lista explícita de IDs
+instalados y confiables aprobada por el host.

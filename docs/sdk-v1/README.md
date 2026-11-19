@@ -1,13 +1,15 @@
-# GameConsole SDK v1 — Fases 0 y 1
+# GameConsole SDK v1 — Fases 0, 1 y 2A
 
-Esta carpeta define el contrato para una evolución incremental. **Solo están
-implementados la validación de manifiestos y el catálogo de paquetes**. El servidor
+Esta carpeta define el contrato para una evolución incremental. **Están
+implementados manifiestos, registro y la infraestructura local de carga confiable,
+preparación y administración de sesiones de Fase 2A**. El servidor
 HTTP actual no importa estos módulos; su catálogo conserva Gato, Snake y Circuito.
-No hay juegos migrados, runtime SDK, iframe, cargador web ni integración nueva con
+No hay juegos migrados, runtime de acciones/eventos activo, iframe, cargador web ni integración nueva con
 Scala. El fixture de `test/fixtures/sdk-v1/example/` no es un cuarto juego.
 
 - [Manifiesto normativo v1](manifest.md): campos, límites y reglas de archivos.
 - [Contrato diseñado de runtime y patrones](runtime-design.md): trabajo futuro.
+- [Fase 2A implementada](phase-2a.md): interfaces exactas, preparación y límites.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada
@@ -102,10 +104,18 @@ Desde la raíz de GameConsole:
 ```powershell
 node --check server/sdk/manifest.mjs
 node --check server/sdk/registry.mjs
+node --check server/sdk/values.mjs
+node --check server/sdk/options.mjs
+node --check server/sdk/initialization.mjs
+node --check server/sdk/loader.mjs
+node --check server/sdk/session-factory.mjs
+node --check server/sdk/instance-manager.mjs
 node --check test/sdk-v1.test.mjs
+node --check test/sdk-runtime.test.mjs
 node --check test/fixtures/sdk-v1/example/server.mjs
 node --check test/fixtures/sdk-v1/example/web.mjs
-node --test test/sdk-v1.test.mjs
+node --check test/fixtures/sdk-runtime/counter/server.mjs
+node --test test/sdk-v1.test.mjs test/sdk-runtime.test.mjs
 ```
 
 No usar `npm test` para esta revisión acotada: incluye pruebas históricas con

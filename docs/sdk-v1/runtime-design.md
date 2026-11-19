@@ -1,7 +1,10 @@
 # Runtime SDK 1.0 — contrato diseñado, pendiente de implementación
 
-Todo lo descrito aquí es diseño para fases posteriores. El registro actual
-almacena metadatos; no resuelve fábricas, crea sesiones ni adapta eventos.
+Este documento describe el runtime objetivo. La [Fase 2A](phase-2a.md) concreta e
+implementa carga confiable, opciones, preparación y administración local de
+sesiones preparadas. La activación con eventos, acciones públicas y coordinador
+de transiciones siguen siendo diseño para fases posteriores. El registro
+continúa almacenando solo metadatos, separado del loader y la fábrica.
 Las rutas HTTP, clases actuales, UI y EventOutbox mantienen su comportamiento.
 
 ## Plugin y sesión
@@ -23,7 +26,7 @@ El host esperará también resultados sincrónicos con `await`. Cada llamada a
 `createSession` debe preparar una sesión nueva con estado de partida independiente.
 `options` es la copia de valores ya validados contra el manifiesto. La fábrica
 no crea identidades ni emite eventos de inicio/cierre. El host valida los exports
-y la interfaz al cargar el módulo en una fase futura; discovery no lo hace.
+y la interfaz al cargar el módulo mediante el loader de 2A; discovery no lo hace.
 
 El snapshot público será `{version, state, data}` más identidad. **GameConsole es
 la única autoridad de `version` y `state`**: versión entera segura no negativa,
@@ -54,7 +57,9 @@ recursos o limpia su estado. Terminar por reglas se solicita con `finishMatch`.
 
 ## Preparación y activación de una sesión
 
-Protocolo futuro obligatorio, sin implementación en esta revisión:
+Protocolo objetivo obligatorio. Los pasos de preparación y validación están
+implementados en 2A según el descriptor exacto de [phase-2a.md](phase-2a.md); la
+construcción/entrega de MATCH_STARTED y la activación del paso 5 siguen pendientes:
 
 1. El host valida opciones, asigna identidad y valida participantes contra
    `manifest.players` y `GamePlugin.initializationContract`. Esta declaración del
@@ -70,9 +75,10 @@ Protocolo futuro obligatorio, sin implementación en esta revisión:
    unicidad, IDs y roles de participantes; todo `playerId` referido debe pertenecer
    al contexto. Campos como dificultad, símbolos o tamaño deben ser consistentes
    con opciones y participantes. No basta con comprobar que exista un objeto.
-4. El host construye `MATCH_STARTED.data = {players: context.players, ...startData}`.
+4. El host construye `MATCH_STARTED.data = {players: context.players.map(p => p.id), ...startData}`.
    `players` y la identidad son reservados: se rechaza `startData` que intente
-   sustituirlos. Solo el host asigna el sobre del evento. Para el futuro Gato,
+   sustituirlos. Los objetos internos `{id,role}` no cambian el arreglo de IDs del
+   contrato GameStats v1. Solo el host asigna el sobre del evento. Para el futuro Gato,
    por ejemplo, se exigirán human/prolog y sus símbolos; para Snake, `gridSize`
    compatible con la opción discreta. Estas son obligaciones de sus contratos,
    no validaciones por ID codificadas en el host ni migraciones actuales.
@@ -225,12 +231,12 @@ entregar exactamente tres juegos funcionales. Los fixtures quedan fuera de
 
 | Patrón | Decisión | Estado en esta fase |
 | --- | --- | --- |
-| Registry + Factory | El registro descubre identidades y metadatos sin condiciones por `gameId`; una fábrica separada creará cada sesión. Evita acoplar catálogo y reglas. | Registry implementado; Factory diseñada. |
+| Registry + Factory | El registro descubre identidades y metadatos sin condiciones por `gameId`; una fábrica separada prepara cada sesión. Evita acoplar catálogo y reglas. | Registry, Loader y preparación de Factory implementados en 2A. |
 | Adapter | Convierte hechos de dominio al sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Futuro; no se modifica EventOutbox. |
 | Observer | El host observa hechos emitidos por la sesión y desacopla reglas de consumidores como transporte o UI. | Futuro; sin bus nuevo. |
-| State | Ciclo running/paused/finished centralizado para evitar que cada plugin redefina transiciones comunes. | Futuro; ninguna clase actual se reescribe. |
-| Dependency Injection | Contexto y servicios por sesión permiten límites explícitos y sustituciones en pruebas. | Futuro. |
-| Facade | Una interfaz del host para catálogo, sesiones y consultas GameStats evita que web/plugins coordinen servicios internos. | Futuro, salvo las operaciones de catálogo del registro. |
+| State | Ciclo running/paused/finished centralizado para evitar que cada plugin redefina transiciones comunes. | Futuro; 2A solo administra prepared/finished locales. Ninguna clase actual se reescribe. |
+| Dependency Injection | Contexto y servicios por sesión permiten límites explícitos y sustituciones en pruebas. | Contexto mínimo de 2A implementado; servicios y eventos siguen pendientes. |
+| Facade | Una interfaz del host para catálogo, sesiones y consultas GameStats evita que web/plugins coordinen servicios internos. | Catálogo y manager de preparación/lectura/cierre implementados; integración GameStats futura. |
 
 La siguiente fase deberá revisar primero carga confiable, fábrica, coordinación
 de cierre, cuotas y errores, y después migrar un juego de forma incremental.
