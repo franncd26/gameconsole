@@ -6,7 +6,9 @@ sesiones preparadas. La [Fase 2B.1](phase-2b1.md) añade activación y cierre co
 EventSink local. La [Fase 2B.2A](phase-2b2a.md) implementa confirmaciones internas
 de estado/versiones/eventos de dominio con celda optativa. La [Fase 2B.2B](phase-2b2b.md)
 implementa dispatch JSON, expectedVersion e historial acotado de requestId.
-Endpoints HTTP, autorización y transporte real siguen pendientes. El registro
+La [Fase 3A](phase-3a.md) conecta un EventSink al EventOutbox real con aceptación
+local de lotes y pruebas de fetcher simulado. HTTP, autorización y verificación
+de entrega contra Go/Scala reales siguen pendientes. El registro
 continúa almacenando solo metadatos, separado del loader y la fábrica.
 Las rutas HTTP, clases actuales, UI y EventOutbox mantienen su comportamiento.
 
@@ -220,7 +222,8 @@ El Adapter de 2B.1 construye el sobre existente de GameStats sin cambiarlo:
 `schemaVersion: 1`, `eventId`, `timestamp`, `gameId`, `matchId`, `type`, `data`,
 y opcionalmente `playerId` (el SDK incluye `gameVersion`). El host asigna ID de evento,
 tiempo UTC e identidad y conserva orden por partida. La entrega/reintentos mediante
-EventOutbox siguen pendientes: por ahora solo se prueba un EventSink en memoria.
+EventOutbox se conectan en 3A mediante OutboxEventSink: se prueba el Outbox real
+con un fetcher simulado; el script contra Go/Scala reales está preparado y no ejecutado.
 Varios eventos de una misma transición requieren acceptBatch de lote completo,
 según [2B.2A](phase-2b2a.md); accept individual no ofrece esa garantía.
 No se envía el acumulado como si fuera incremento. Aceptación local
@@ -252,7 +255,7 @@ entregar exactamente tres juegos funcionales. Los fixtures quedan fuera de
 | Patrón | Decisión | Estado en esta fase |
 | --- | --- | --- |
 | Registry + Factory | El registro descubre identidades y metadatos sin condiciones por `gameId`; una fábrica separada prepara cada sesión. Evita acoplar catálogo y reglas. | Registry, Loader y preparación de Factory implementados en 2A. |
-| Adapter | Construye el sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Ciclo de vida en 2B.1; publicación interna coordinada de dominio en 2B.2A. Conexión EventOutbox pendiente. |
+| Adapter | Construye el sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Ciclo de vida en 2B.1; dominio en 2B.2A; OutboxEventSink y lotes locales en 3A. Go/Scala real pendiente de verificación manual. |
 | Observer | El host observa hechos emitidos por la sesión y desacopla reglas de consumidores como transporte o UI. | Futuro; sin bus nuevo. |
 | State | Ciclo de vida centralizado y confirmación explícita para evitar autoridades contradictorias. | prepared/running/closing/finished y coordinación interna de dominio implementados; pausa pública pendiente. Ninguna clase actual se reescribe. |
 | Dependency Injection | Contexto y servicios por sesión permiten límites explícitos y sustituciones en pruebas. | Contexto mínimo, celda optativa y sink inyectable implementados; servicios externos y transporte real pendientes. |

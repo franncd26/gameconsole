@@ -1,11 +1,12 @@
-# GameConsole SDK v1 — Fases 0, 1, 2A, 2B.1, 2B.2A y 2B.2B
+# GameConsole SDK v1 — Fases 0, 1, 2A, 2B y 3A
 
 Esta carpeta define el contrato para una evolución incremental. **Están
 implementados manifiestos, registro y la infraestructura local de carga confiable,
 preparación y administración de sesiones de Fase 2A, y activación/cierre con eventos
 de ciclo de vida mediante EventSink inyectable de Fase 2B.1, y confirmación interna
 de datos/eventos/versiones de Fase 2B.2A y fachada dispatch JSON con historial
-acotado de Fase 2B.2B**. El servidor
+acotado de Fase 2B.2B, y adaptador EventSink → EventOutbox con lotes de Fase 3A**.
+El transporte se prueba con fetcher simulado; el humo Go/Scala queda manual. El servidor
 HTTP actual no importa estos módulos; su catálogo conserva Gato, Snake y Circuito.
 No hay juegos migrados, endpoints de acciones HTTP, autenticación, transporte real a Go,
 iframe, cargador web ni integración real nueva con
@@ -17,6 +18,7 @@ Scala. El fixture de `test/fixtures/sdk-v1/example/` no es un cuarto juego.
 - [Fase 2B.1 implementada](phase-2b1.md): eventos v1, aceptación local, activación y cierre.
 - [Fase 2B.2A implementada](phase-2b2a.md): celda optativa, confirmaciones, lotes y fallos parciales.
 - [Fase 2B.2B implementada](phase-2b2b.md): dispatch JSON, expectedVersion, replay e historial FIFO.
+- [Fase 3A implementada](phase-3a.md): OutboxEventSink, enqueueBatch, pruebas locales y humo manual pendiente.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada

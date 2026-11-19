@@ -3,6 +3,8 @@
 Se añade `await manager.dispatch(matchId, action)` como fachada de datos del SDK.
 No se crean endpoints HTTP, frontend, cuentas, autenticación o autorización de
 jugadores. Las clases históricas y su integración actual siguen independientes.
+La [Fase 3A](phase-3a.md) añade OutboxEventSink y aceptación de lotes en Outbox;
+el flujo real contra Go/Scala sigue siendo una comprobación manual pendiente.
 
 ## Contrato exacto
 

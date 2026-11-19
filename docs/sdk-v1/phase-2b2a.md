@@ -4,6 +4,8 @@ Esta referencia conserva el protocolo y las correcciones auditadas de 2B.2A. La
 [Fase 2B.2B](phase-2b2b.md) añade la fachada JSON dispatch y concreta expectedVersion
 e historial de requestId, reutilizando este coordinador sin alterar confirmaciones,
 acceptBatch ni cierre condicionado al éxito.
+La [Fase 3A](phase-3a.md) concreta la aceptación local de lotes en EventOutbox y
+su adaptador, sin prometer atomicidad remota ni integración Go/Scala verificada.
 
 ## Correcciones de auditoría: cierre condicionado y una confirmación pendiente
 
