@@ -46,6 +46,70 @@ El cierre CLI solicita también el cierre de sesiones SDK antes del flush existe
 Un import autorizado ejecuta código Node con permisos del proceso: la confianza
 es una decisión administrativa, no aislamiento ni sandbox.
 
+### Corrección de auditoría: apagado y fallos independientes
+
+`app.sdk.shutdown()` conserva su firma asíncrona: resuelve sin valor si todos los
+cierres funcionan. Enumera sesiones y solicita `manager.finish(id, {reason:
+'shutdown'})` para cada una. Espera **todos** esos cierres con `Promise.allSettled`.
+Si alguno falla, solo entonces rechaza con `SDK_SHUTDOWN_FAILED`, mensaje fijo y
+`failures: [{matchId, code}]`. No conserva excepciones crudas, causas ni mensajes
+privados. Un fallo de enumeración produce el mismo código agregado con
+`failures: [{code:'SDK_ENUMERATION_FAILED'}]`; no inventa cierres no iniciados.
+
+`shutdownApp(app)`, exportada de `server/index.mjs` para uso interno del anfitrión
+y pruebas sin señales, solicita los cierres históricos usando el contrato
+`exclusive(() => finish('shutdown'))` y el apagado SDK. Espera todos sus resultados;
+un cierre histórico fallido tampoco salta el SDK ni el vaciado. En `finally`
+intenta siempre `outbox.flush(5000)` y solo después llama `outbox.stop()`, aunque
+el vaciado rechace. Devuelve un informe JSON saneado:
+
+```js
+{
+  closeFailures: [{source: 'sdk', code: 'CLEANUP_FAILED'}],
+  delivery: {status: 'flushed'}
+}
+// Si falla el vaciado:
+// delivery: {status: 'failed', code: 'OUTBOX_FLUSH_FAILED'}
+```
+
+Los fallos son independientes:
+
+- `CLEANUP_FAILED`: el plugin falló al limpiar. Según el manager existente,
+  MATCH_FINISHED puede haber sido aceptado localmente y el snapshot estar
+  `finished`. Se vacía igualmente el Outbox; no se revierte ni duplica ese cierre.
+- `EVENT_ACCEPTANCE_FAILED` / `EVENT_SINK_UNAVAILABLE`: no se confirmó aceptación
+  local. El manager conserva `closing` y el sobre para un reintento explícito
+  mientras el transporte siga operativo; no se fabrica otro evento. Si coexistió
+  un fallo de limpieza, se mantiene la prioridad y retención de errores del manager
+  existente: el rechazo de aceptación es el error comunicado en ese intento.
+- `OUTBOX_FLUSH_FAILED`: la entrega de pendientes no quedó confirmada durante
+  el plazo. No se registra éxito ni se afirma que todo llegó a Go. Se informa
+  separadamente de los fallos de sesión y después se detiene el transporte.
+
+`delivery.status='flushed'` solo acredita que el Outbox terminó de vaciar su
+prefijo local aceptado; **no** acredita cierre de todas las partidas, aceptación
+de un evento rechazado ni cálculo en Scala. Los fallos históricos se reportan
+como `HISTORICAL_CLOSE_FAILED`; otros fallos se reducen a códigos fijos.
+El CLI registra los códigos de cierre y entrega por separado, sale con código 1
+si hubo alguno, y comparte una sola promesa entre señales repetidas para no
+ejecutar vaciados/detenciones concurrentes.
+
+Un cierre que resuelve o rechaza nunca omite flush por su fallo. Un plugin que
+**nunca termina** puede retener el apagado antes de llegar al vaciado; no se
+introduce timeout ni cancelación ficticia de sesiones. Una terminación forzada,
+caída del proceso o nuevas operaciones concurrentes de clientes siguen fuera
+de una garantía durable de apagado. No se añade una barrera de admisión HTTP ni
+se rediseña el ciclo de vida en esta corrección.
+
+Regresión aislada sin sockets, señales reales ni servicios externos:
+
+```powershell
+node --check server/sdk/bootstrap.mjs
+node --check server/index.mjs
+node --check test/sdk-shutdown.test.mjs
+node --test test/sdk-shutdown.test.mjs
+```
+
 Configuración optativa (PowerShell, directorio de paquetes revisados por el equipo):
 
 ```powershell

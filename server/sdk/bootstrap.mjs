@@ -22,7 +22,27 @@ class PreparedSDK {
       catalog: () => structuredClone(this.#catalog),
       isTrusted: (id) => this.#trusted.has(id),
       async shutdown() {
-        await Promise.all((await manager.list()).map((s) => manager.finish(s.matchId, { reason: 'shutdown' })));
+        let sessions;
+        try { sessions = await manager.list(); }
+        catch {
+          const error = new SDKError('SDK_SHUTDOWN_FAILED', 'No se pudieron enumerar las sesiones para el apagado.');
+          error.failures = [{ code: 'SDK_ENUMERATION_FAILED' }];
+          throw error;
+        }
+        const settled = await Promise.allSettled(sessions.map((s) =>
+          Promise.resolve().then(() => manager.finish(s.matchId, { reason: 'shutdown' }))));
+        const failures = settled.flatMap((result, index) => {
+          if (result.status === 'fulfilled') return [];
+          const code = ['CLEANUP_FAILED', 'EVENT_ACCEPTANCE_FAILED', 'EVENT_SINK_UNAVAILABLE',
+            'INVALID_SNAPSHOT', 'VERSION_LIMIT', 'UNKNOWN_MATCH', 'INVALID_LIFECYCLE'].includes(result.reason?.code)
+            ? result.reason.code : 'SDK_CLOSE_FAILED';
+          return [{ matchId: sessions[index].matchId, code }];
+        });
+        if (failures.length) {
+          const error = new SDKError('SDK_SHUTDOWN_FAILED', 'Uno o más cierres SDK fallaron; todos los cierres iniciados han terminado.');
+          error.failures = failures; // Internal diagnostics only; never retain raw plugin errors/causes.
+          throw error;
+        }
       },
     });
   }

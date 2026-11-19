@@ -175,6 +175,45 @@ export function createApp({
   });
   return { server, matches, outbox, sdk: sdkRuntime };
 }
+
+/** Host-only shutdown, testable without signals. Failure to close must never skip flush. */
+export async function shutdownApp(app) {
+  const report = { closeFailures: [], delivery: { status: 'pending' } };
+  try {
+    const historical = [...app.matches.values()];
+    const operations = historical.map((m) => () => m.exclusive(() => m.finish("shutdown")));
+    operations.push(() => app.sdk?.shutdown());
+    const settled = await Promise.allSettled(operations.map((close) => Promise.resolve().then(close)));
+    for (const [index, result] of settled.entries()) {
+      if (result.status === 'fulfilled') continue;
+      if (index < historical.length) {
+        report.closeFailures.push({ source: 'historical', code: 'HISTORICAL_CLOSE_FAILED' });
+      } else {
+        // shutdown() aggregates only sanitized codes after all SDK closes settle.
+        const allowed = ['CLEANUP_FAILED', 'EVENT_ACCEPTANCE_FAILED', 'EVENT_SINK_UNAVAILABLE',
+          'INVALID_SNAPSHOT', 'VERSION_LIMIT', 'UNKNOWN_MATCH', 'INVALID_LIFECYCLE',
+          'SDK_CLOSE_FAILED', 'SDK_ENUMERATION_FAILED'];
+        const failures = result.reason?.code === 'SDK_SHUTDOWN_FAILED' && Array.isArray(result.reason.failures)
+          ? result.reason.failures : [{ code: 'SDK_CLOSE_FAILED' }];
+        report.closeFailures.push(...failures.map((failure) => ({ source: 'sdk',
+          code: allowed.includes(failure.code) ? failure.code : 'SDK_CLOSE_FAILED' })));
+      }
+    }
+  } catch {
+    report.closeFailures.push({ source: 'host', code: 'SHUTDOWN_CLOSE_FAILED' });
+  } finally {
+    try {
+      await app.outbox.flush(5000);
+      report.delivery = { status: 'flushed' };
+    } catch {
+      report.delivery = { status: 'failed', code: 'OUTBOX_FLUSH_FAILED' };
+    } finally {
+      app.outbox.stop();
+    }
+  }
+  return report;
+}
+
 if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
@@ -190,22 +229,20 @@ if (
     app.server.listen(port, process.env.HOST || "127.0.0.1", () =>
       console.log(`GameConsole: http://127.0.0.1:${port}`),
     );
-    for (const signal of ["SIGINT", "SIGTERM"])
-      process.on(signal, async () => {
-        try {
-          await Promise.all(
-            [...app.matches.values()].map((m) =>
-              m.exclusive(() => m.finish("shutdown")),
-            ),
-          );
-          await app.sdk?.shutdown();
-          await app.outbox.flush(5000);
-        } catch {
-          console.error("Quedaron eventos sin entregar al detener el servidor.");
-        }
-        app.outbox.stop();
-        app.server.close(() => process.exit());
+    let stopping;
+    const shutdown = () => {
+      stopping ??= (async () => {
+        const report = await shutdownApp(app);
+        for (const failure of report.closeFailures)
+          console.error(`Apagado: ${failure.source}/${failure.code}.`);
+        if (report.delivery.status === 'failed')
+          console.error("OUTBOX_FLUSH_FAILED: quedaron eventos cuya entrega no se confirmó.");
+        const exitCode = report.closeFailures.length || report.delivery.status === 'failed' ? 1 : 0;
+        app.server.close(() => process.exit(exitCode));
         setTimeout(() => process.exit(1), 2000).unref();
-      });
+      })();
+      return stopping;
+    };
+    for (const signal of ["SIGINT", "SIGTERM"]) process.on(signal, shutdown);
   }
 }
