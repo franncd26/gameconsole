@@ -1,12 +1,13 @@
-# GameConsole SDK v1 — Fases 0, 1, 2A, 2B.1 y 2B.2A
+# GameConsole SDK v1 — Fases 0, 1, 2A, 2B.1, 2B.2A y 2B.2B
 
 Esta carpeta define el contrato para una evolución incremental. **Están
 implementados manifiestos, registro y la infraestructura local de carga confiable,
 preparación y administración de sesiones de Fase 2A, y activación/cierre con eventos
 de ciclo de vida mediante EventSink inyectable de Fase 2B.1, y confirmación interna
-de datos/eventos/versiones de Fase 2B.2A**. El servidor
+de datos/eventos/versiones de Fase 2B.2A y fachada dispatch JSON con historial
+acotado de Fase 2B.2B**. El servidor
 HTTP actual no importa estos módulos; su catálogo conserva Gato, Snake y Circuito.
-No hay juegos migrados, acciones públicas, transporte real a Go,
+No hay juegos migrados, endpoints de acciones HTTP, autenticación, transporte real a Go,
 iframe, cargador web ni integración real nueva con
 Scala. El fixture de `test/fixtures/sdk-v1/example/` no es un cuarto juego.
 
@@ -15,6 +16,7 @@ Scala. El fixture de `test/fixtures/sdk-v1/example/` no es un cuarto juego.
 - [Fase 2A implementada](phase-2a.md): interfaces exactas, preparación y límites.
 - [Fase 2B.1 implementada](phase-2b1.md): eventos v1, aceptación local, activación y cierre.
 - [Fase 2B.2A implementada](phase-2b2a.md): celda optativa, confirmaciones, lotes y fallos parciales.
+- [Fase 2B.2B implementada](phase-2b2b.md): dispatch JSON, expectedVersion, replay e historial FIFO.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada
@@ -116,15 +118,18 @@ node --check server/sdk/loader.mjs
 node --check server/sdk/session-factory.mjs
 node --check server/sdk/instance-manager.mjs
 node --check server/sdk/event-adapter.mjs
+node --check server/sdk/actions.mjs
 node --check test/sdk-v1.test.mjs
 node --check test/sdk-runtime.test.mjs
 node --check test/sdk-lifecycle.test.mjs
 node --check test/sdk-transitions.test.mjs
+node --check test/sdk-actions.test.mjs
 node --check test/fixtures/sdk-v1/example/server.mjs
 node --check test/fixtures/sdk-v1/example/web.mjs
 node --check test/fixtures/sdk-runtime/counter/server.mjs
 node --check test/fixtures/sdk-transitions/plugin.mjs
-node --test test/sdk-v1.test.mjs test/sdk-runtime.test.mjs test/sdk-lifecycle.test.mjs test/sdk-transitions.test.mjs
+node --check test/fixtures/sdk-actions/plugin.mjs
+node --test test/sdk-v1.test.mjs test/sdk-runtime.test.mjs test/sdk-lifecycle.test.mjs test/sdk-transitions.test.mjs test/sdk-actions.test.mjs
 ```
 
 No usar `npm test` para esta revisión acotada: incluye pruebas históricas con

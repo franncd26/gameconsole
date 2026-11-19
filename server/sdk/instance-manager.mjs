@@ -1,9 +1,10 @@
 import { GameSessionFactory } from './session-factory.mjs';
 import { GameEventAdapter } from './event-adapter.mjs';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { copyJSON, isObject, requireSDK, SDKError } from './values.mjs';
+import { validateAction, actionFingerprint } from './actions.mjs';
+import { copyJSON, freezeJSON, isObject, requireSDK, SDKError } from './values.mjs';
 
-/** Host-internal lifecycle/transition coordinator; no HTTP or public dispatch. */
+/** JSON action facade and host-internal coordinator; no HTTP or client authentication. */
 export class GameInstanceManager {
   #factory;
   #instances = new Map();
@@ -12,12 +13,16 @@ export class GameInstanceManager {
   #acceptEvent;
   #acceptBatch;
   #operationScope = new AsyncLocalStorage();
+  #requestHistoryLimit;
 
-  constructor(factory, { limit = 500, eventSink } = {}) {
+  constructor(factory, { limit = 500, eventSink, requestHistoryLimit = 128 } = {}) {
     requireSDK(factory instanceof GameSessionFactory && Number.isInteger(limit) && limit >= 1 && limit <= 500,
       'INVALID_CONFIGURATION', 'Se requiere fábrica y límite entre 1 y 500.');
     this.#factory = factory;
     this.#limit = limit;
+    requireSDK(Number.isSafeInteger(requestHistoryLimit) && requestHistoryLimit >= 1 && requestHistoryLimit <= 1024,
+      'INVALID_CONFIGURATION', 'El historial de solicitudes debe estar entre 1 y 1024 entradas por partida.');
+    this.#requestHistoryLimit = requestHistoryLimit;
     requireSDK(eventSink === undefined || typeof eventSink?.accept === 'function',
       'INVALID_CONFIGURATION', 'EventSink debe implementar accept(event).');
     requireSDK(eventSink?.acceptBatch === undefined || typeof eventSink.acceptBatch === 'function',
@@ -39,7 +44,8 @@ export class GameInstanceManager {
         .some((entry) => entry.prepared.manifest.id === gameId && entry.state !== 'finished'),
       'MULTIPLE_INSTANCES_DISABLED', 'Este plugin solo admite una instancia sin finalizar.');
       requireSDK(!this.#instances.has(prepared.matchId), 'DUPLICATE_MATCH', 'La identidad de partida ya existe.');
-      const entry = { prepared, state: 'prepared', version: 0, queue: Promise.resolve(), lastData: data, finalData: null };
+      const entry = { prepared, state: 'prepared', version: 0, queue: Promise.resolve(), lastData: data, finalData: null,
+        requests: new Map(), inFlightRequests: new Map() };
       const snapshot = this.#snapshot(entry, data);
       this.#instances.set(prepared.matchId, entry);
       return snapshot;
@@ -66,7 +72,8 @@ export class GameInstanceManager {
     }
     const next = entry.queue.then(() => {
       requireSDK(this.#instances.get(matchId) === entry, 'UNKNOWN_MATCH', 'La preparación fue descartada.');
-      return operation(entry);
+      // Lifecycle/sink callbacks also must not await the queue they are currently holding.
+      return this.#operationScope.run({ entry }, () => operation(entry));
     });
     entry.queue = next.catch(() => {});
     return next;
@@ -176,10 +183,75 @@ export class GameInstanceManager {
     return this.#snapshot(entry, entry.finalData);
   }
 
+  #dispatchRejection(entry, code) {
+    const messages = {
+      INVALID_ACTION: 'Sobre de acción inválido; solo se admiten los campos y tipos JSON del contrato.',
+      UNKNOWN_MATCH: 'La partida no existe.',
+      REENTRANT_OPERATION: 'No se puede esperar recursivamente la cola de esta partida.',
+      REQUEST_CONFLICT: 'requestId ya identifica una solicitud de contenido diferente.',
+      VERSION_CONFLICT: 'expectedVersion no coincide con la versión pública vigente.',
+      INVALID_LIFECYCLE: 'Solo running permite ejecutar una acción nueva.',
+      COORDINATED_STATE_REQUIRED: 'El plugin no declaró una celda coordinada.',
+    };
+    return { outcome: 'rejected', committed: false, confirmations: 0,
+      snapshot: entry ? this.#snapshot(entry, ['closing', 'finished'].includes(entry.state) ? entry.finalData : entry.lastData) : null,
+      error: { code, message: messages[code] } };
+  }
+
+  #queueDispatch(matchId, execute) {
+    return this.#enqueue(matchId, execute).catch((error) => {
+      if (['UNKNOWN_MATCH', 'REENTRANT_OPERATION'].includes(error?.code)) {
+        return this.#dispatchRejection(this.#instances.get(matchId), error.code);
+      }
+      // Unexpected host faults must not be reported as an uncommitted action or expose internal traces/messages.
+      throw new SDKError('DISPATCH_FAILED', 'Falló la infraestructura de acciones; consulta el snapshot antes de continuar.');
+    });
+  }
+
+  #rememberRequest(entry, action, fingerprint, result) {
+    // Host-generated envelopes already contain validated JSON; clone without reapplying the payload depth budget to wrappers.
+    entry.requests.set(action.requestId, { fingerprint, result: freezeJSON(structuredClone(result)) });
+    if (entry.requests.size > this.#requestHistoryLimit) entry.requests.delete(entry.requests.keys().next().value);
+  }
+
+  async #dispatchEntry(entry, action, fingerprint) {
+    const prior = entry.requests.get(action.requestId);
+    if (prior) return prior.fingerprint === fingerprint ? structuredClone(prior.result) : this.#dispatchRejection(entry, 'REQUEST_CONFLICT');
+    if (entry.state !== 'running') return this.#dispatchRejection(entry, 'INVALID_LIFECYCLE');
+    if (!entry.prepared.hasCoordinatedState) return this.#dispatchRejection(entry, 'COORDINATED_STATE_REQUIRED');
+    const result = Object.hasOwn(action, 'expectedVersion') && action.expectedVersion !== entry.version
+      ? this.#dispatchRejection(entry, 'VERSION_CONFLICT')
+      : await this.#runOperation(entry, (session) => session.dispatch(action));
+    this.#rememberRequest(entry, action, fingerprint, result);
+    return result;
+  }
+
+  /** Public data-only API. Pending duplicates share a promise, never a second operation queue. */
+  async dispatch(matchId, input) {
+    let action, fingerprint;
+    try { action = validateAction(input); fingerprint = actionFingerprint(action); } catch { /* Return a sanitized JSON rejection below. */ }
+    const entry = this.#instances.get(matchId);
+    if (!entry) return this.#dispatchRejection(null, action ? 'UNKNOWN_MATCH' : 'INVALID_ACTION');
+    if (this.#operationScope.getStore()?.entry === entry) return this.#dispatchRejection(entry, 'REENTRANT_OPERATION');
+    if (!action) return this.#queueDispatch(matchId, (current) => this.#dispatchRejection(current, 'INVALID_ACTION'));
+    const pending = entry.inFlightRequests.get(action.requestId);
+    if (pending) {
+      return pending.fingerprint === fingerprint ? structuredClone(await pending.promise)
+        : this.#queueDispatch(matchId, (current) => this.#dispatchRejection(current, 'REQUEST_CONFLICT'));
+    }
+    const record = { fingerprint, promise: this.#queueDispatch(matchId, (current) => this.#dispatchEntry(current, action, fingerprint)) };
+    entry.inFlightRequests.set(action.requestId, record);
+    try { return structuredClone(await record.promise); }
+    finally { if (entry.inFlightRequests.get(action.requestId) === record) entry.inFlightRequests.delete(action.requestId); }
+  }
+
   /** Trusted host/test entry point; deliberately no public action envelope or dispatch endpoint. */
   runOperation(matchId, operation) {
     if (typeof operation !== 'function') return Promise.reject(new SDKError('INVALID_CONFIGURATION', 'Se requiere una operación interna.'));
-    return this.#enqueue(matchId, async (entry) => {
+    return this.#enqueue(matchId, (entry) => this.#runOperation(entry, operation));
+  }
+
+  async #runOperation(entry, operation) {
       requireSDK(entry.state === 'running', 'INVALID_LIFECYCLE', 'Solo running permite operaciones de dominio.');
       const p = entry.prepared;
       let accepting = true;
@@ -289,6 +361,5 @@ export class GameInstanceManager {
           ...(error ? { error: errorInfo(error) } : {}),
         };
       });
-    });
   }
 }

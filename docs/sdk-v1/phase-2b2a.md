@@ -1,5 +1,10 @@
 # Fase 2B.2A — protocolo de confirmación local
 
+Esta referencia conserva el protocolo y las correcciones auditadas de 2B.2A. La
+[Fase 2B.2B](phase-2b2b.md) añade la fachada JSON dispatch y concreta expectedVersion
+e historial de requestId, reutilizando este coordinador sin alterar confirmaciones,
+acceptBatch ni cierre condicionado al éxito.
+
 ## Correcciones de auditoría: cierre condicionado y una confirmación pendiente
 
 El cierre automático anterior atendía toda intención registrada sin comprobar el

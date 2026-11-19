@@ -4,8 +4,9 @@ Este documento describe el runtime objetivo. La [Fase 2A](phase-2a.md) concreta 
 implementa carga confiable, opciones, preparación y administración local de
 sesiones preparadas. La [Fase 2B.1](phase-2b1.md) añade activación y cierre con un
 EventSink local. La [Fase 2B.2A](phase-2b2a.md) implementa confirmaciones internas
-de estado/versiones/eventos de dominio con celda optativa. Acciones públicas,
-deduplicación y transporte real siguen siendo diseño para fases posteriores. El registro
+de estado/versiones/eventos de dominio con celda optativa. La [Fase 2B.2B](phase-2b2b.md)
+implementa dispatch JSON, expectedVersion e historial acotado de requestId.
+Endpoints HTTP, autorización y transporte real siguen pendientes. El registro
 continúa almacenando solo metadatos, separado del loader y la fábrica.
 Las rutas HTTP, clases actuales, UI y EventOutbox mantienen su comportamiento.
 
@@ -63,7 +64,8 @@ Protocolo objetivo obligatorio. Los pasos de preparación y validación están
 implementados en 2A según el descriptor exacto de [phase-2a.md](phase-2a.md); la
 construcción de MATCH_STARTED y la activación local del paso 5 se implementan en
 2B.1. En 2B.2A se permite dominio mediante operaciones internas coordinadas. La
-entrega real a Go y habilitación de acciones públicas siguen pendientes:
+entrega real a Go y endpoints públicos siguen pendientes; 2B.2B añade una fachada
+de datos del manager que utiliza esas mismas operaciones coordinadas:
 
 1. El host valida opciones, asigna identidad y valida participantes contra
    `manifest.players` y `GamePlugin.initializationContract`. Esta declaración del
@@ -92,7 +94,8 @@ entrega real a Go y habilitación de acciones públicas siguen pendientes:
    El transporte remoto no tiene que haber entregado el evento para habilitarla.
    En 2B.1 solo se habilita el ciclo de vida running; las acciones y eventos de
    dominio permanecían deshabilitados. 2B.2A permite únicamente operaciones
-   internas con confirmación explícita; no habilita dispatch público.
+   internas con confirmación explícita. 2B.2B añade manager.dispatch como fachada
+   JSON con versión e idempotencia, sin endpoints ni permisos de clientes.
 
 Cualquier fallo antes de aceptar el inicio impide publicar la instancia y emitir
 eventos de dominio; el host limpia la sesión preparada con `finish` en modo de
@@ -126,7 +129,7 @@ Node ejecutado en proceso puede usar APIs de Node. No se promete sandbox v1.
 
 ## Acciones y concurrencia
 
-El protocolo futuro será `{requestId,type,payload,expectedVersion?}`:
+El protocolo de manager.dispatch es `{requestId,type,payload,expectedVersion?}`:
 
 - `requestId`: string no vacío de hasta 128 caracteres, sin controles; único por
   operación lógica dentro de una partida. Un reintento usa el mismo ID.
@@ -150,8 +153,12 @@ aceptado sin volver a ejecutar; con contenido diferente rechazará por conflicto
 Esto incluye resultados `dependency_failed` con cambios confirmados: repetir el
 mismo requestId no repite la jugada humana ni los eventos. Para recuperar una
 decisión pendiente se usa una acción explícita del plugin con otro requestId.
-La ventana y límite de esa deduplicación deberán especificarse al implementar
-el runtime; no se promete persistencia después de reiniciar. El plugin validará
+La ventana de 2B.2B es FIFO de 128 resultados por partida por defecto, configurable
+entre 1 y 1024. Se incluyen fallos parciales y conflictos de versión; se comprueba
+el historial antes de estado/versión para devolver el snapshot original. Las
+claves de objetos JSON se ordenan recursivamente; los arrays conservan su orden.
+No se promete idempotencia tras expulsión ni persistencia después de reiniciar.
+El plugin validará
 la legalidad de la acción. Ni `requestId` ni `expectedVersion` reemplazan control
 de acceso o titularidad de partida, que sigue fuera de esta fase.
 
