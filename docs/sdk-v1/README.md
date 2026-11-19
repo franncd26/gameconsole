@@ -63,6 +63,32 @@ La raíz ausente (`ENOENT`) devuelve catálogo vacío y ningún error. Otros fal
 al inspeccionar la raíz producen `DISCOVERY_IO` con `candidate: null`.
 Cada paquete rechazado se aísla y se continúa con los restantes.
 
+## Catálogo obligatorio en producción — contrato de integración futuro
+
+El resultado de discovery es un diagnóstico utilizable, **no una autorización de
+arranque**. Se conserva la política de primer paquete válido para inspección y
+pruebas. Que el registro contenga un ID no resuelve un conflicto si existe además
+un rechazo `DUPLICATE_ID`. No se elegirá silenciosamente un ganador en producción.
+
+Antes de publicar rutas o aceptar partidas, el futuro bootstrap productivo deberá:
+
+1. Ejecutar discovery y revisar todos sus errores. Cualquier rechazo, incluidos
+   duplicados y errores de lectura, bloqueará el arranque productivo con un
+   diagnóstico explícito. Los paquetes siguen aislados durante la inspección.
+2. Comparar los IDs válidos con un conjunto obligatorio configurado y aprobado
+   para el despliegue. Para la entrega académica será exactamente
+   `tic-tac-toe`, `snake`, `racing`: faltantes y extras bloquearán el arranque,
+   incluso si la raíz ausente devolvió un registro vacío sin errores.
+3. Habilitar la aplicación solo tras superar ambas comprobaciones; sin fallback
+   silencioso a un catálogo parcial ni selección implícita de un duplicado.
+
+El conjunto pertenece a la configuración del despliegue, no al SDK genérico ni a
+condiciones por juego en el registro. Esto permite N paquetes en otros despliegues.
+La comprobación será previa a la apertura del servidor, sin necesidad de cambiar
+la API del discovery. **Ese bootstrap no está implementado ni conectado al HTTP
+actual**. No deben desplegarse los fixtures como plugins productivos. No se cambia
+el comportamiento de directorio ausente ni la política actual de registro.
+
 Códigos: `INVALID_JSON`, `INVALID_MANIFEST`, `INCOMPATIBLE_VERSION`, `UNSAFE_PATH`,
 `INVALID_PATH`, `DUPLICATE_ID`, `DISCOVERY_IO`. Los mensajes incluyen un campo del
 contrato y una explicación fija; no incluyen contenido del JSON, mensajes crudos
@@ -85,4 +111,5 @@ node --test test/sdk-v1.test.mjs
 No usar `npm test` para esta revisión acotada: incluye pruebas históricas con
 servicios y Prolog. La nueva prueba solo usa memoria y archivos temporales; no
 ejecuta los entrypoints trampa del fixture. El caso de symlink/junction informa
-un skip explícito si el sistema no permite crear el enlace.
+un skip explícito si el sistema no permite crear el enlace. `web.mjs` es ahora un
+recurso de la página `web.html`; comprobar su sintaxis no ejecuta la página.

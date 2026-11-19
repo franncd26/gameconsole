@@ -57,11 +57,11 @@ function relativeFile(value, extension, field) {
 function option(value, index) {
   const field = `options[${index}]`;
   const common = ['id', 'label', 'description', 'type', 'default'];
-  const extra = { boolean: [], integer: ['min', 'max'], string: ['minLength', 'maxLength'], enum: ['values'] };
+  const extra = { boolean: [], integer: ['min', 'max', 'values'], string: ['minLength', 'maxLength'], enum: ['values'] };
   // Validate the discriminant before selecting the permitted keys.
   if (!value || !Object.hasOwn(extra, value.type)) fail(field, 'tipo de opción no compatible');
   object(value, [...common, ...extra[value.type]],
-    ['id', 'label', 'type', 'default', ...extra[value.type]], field);
+    ['id', 'label', 'type', 'default', ...(value.type === 'integer' ? [] : extra[value.type])], field);
   string(value.id, 64, `${field}.id`);
   if (!ID.test(value.id)) fail(`${field}.id`, 'identificador no seguro');
   string(value.label, 80, `${field}.label`);
@@ -70,11 +70,29 @@ function option(value, index) {
     case 'boolean':
       if (typeof value.default !== 'boolean') fail(`${field}.default`, 'se requiere booleano');
       break;
-    case 'integer':
-      integer(value.min, -1_000_000, 1_000_000, `${field}.min`);
-      integer(value.max, value.min, 1_000_000, `${field}.max`);
-      integer(value.default, value.min, value.max, `${field}.default`);
+    case 'integer': {
+      const discrete = Object.hasOwn(value, 'values');
+      const hasMin = Object.hasOwn(value, 'min');
+      const hasMax = Object.hasOwn(value, 'max');
+      if (discrete ? (hasMin || hasMax) : (!hasMin || !hasMax)) {
+        fail(field, 'debe declarar solo values o bien min y max juntos');
+      }
+      if (discrete) {
+        if (!Array.isArray(value.values) || value.values.length < 1 || value.values.length > 32) {
+          fail(`${field}.values`, 'se requieren entre 1 y 32 enteros distintos');
+        }
+        value.values.forEach((item) => integer(item, -1_000_000, 1_000_000, `${field}.values`));
+        integer(value.default, -1_000_000, 1_000_000, `${field}.default`);
+        if (new Set(value.values).size !== value.values.length || !value.values.includes(value.default)) {
+          fail(field, 'valores repetidos o default fuera de values');
+        }
+      } else {
+        integer(value.min, -1_000_000, 1_000_000, `${field}.min`);
+        integer(value.max, value.min, 1_000_000, `${field}.max`);
+        integer(value.default, value.min, value.max, `${field}.default`);
+      }
       break;
+    }
     case 'string':
       integer(value.minLength, 1, 256, `${field}.minLength`);
       integer(value.maxLength, value.minLength, 256, `${field}.maxLength`);
@@ -111,7 +129,7 @@ export function validateManifest(value) {
   if (!ID.test(value.category)) fail('category', 'se requiere un slug seguro');
   object(value.entrypoints, ['server', 'web'], ['server', 'web'], 'entrypoints');
   relativeFile(value.entrypoints.server, '.mjs', 'entrypoints.server');
-  relativeFile(value.entrypoints.web, '.mjs', 'entrypoints.web');
+  relativeFile(value.entrypoints.web, '.html', 'entrypoints.web');
   const capabilities = ['pause', 'resume', 'multipleInstances', 'ai'];
   object(value.capabilities, capabilities, capabilities, 'capabilities');
   for (const key of capabilities) {

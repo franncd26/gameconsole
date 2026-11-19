@@ -38,6 +38,47 @@ test('valida un manifiesto completo y devuelve una copia defensiva', async () =>
   const loaded = await loadManifest(fixture);
   assert.equal(loaded.manifest.id, 'sdk-example');
   assert.ok(path.isAbsolute(loaded.paths.server));
+  assert.equal(loaded.paths.web, path.join(fixture, 'web.html'));
+});
+
+test('entrypoints.web exige HTML y rechaza un módulo ESM como página', () => {
+  assert.throws(() => validateManifest({ ...template, entrypoints: { ...template.entrypoints, web: 'web.mjs' } }),
+    { code: 'UNSAFE_PATH', field: 'entrypoints.web' });
+});
+
+test('opción entera discreta de Snake admite únicamente 12, 20 y 28', () => {
+  for (const defaultValue of [12, 20, 28]) {
+    const manifest = structuredClone(template);
+    manifest.options[1].default = defaultValue;
+    assert.deepEqual(validateManifest(manifest).options[1].values, [12, 20, 28]);
+  }
+  for (const defaultValue of [4, 13, 16, 24, 29, '20', 20.5, null]) {
+    const manifest = structuredClone(template);
+    manifest.options[1].default = defaultValue;
+    assert.throws(() => validateManifest(manifest), { code: 'INVALID_MANIFEST' });
+  }
+});
+
+test('enteros por intervalo conservan límites inclusivos y rechazan configuraciones contradictorias', () => {
+  const interval = { id: 'size', label: 'Tamaño', type: 'integer', min: 12, max: 28, default: 12 };
+  for (const defaultValue of [12, 16, 28]) {
+    assert.equal(validateManifest({ ...template, options: [{ ...interval, default: defaultValue }] })
+      .options[0].default, defaultValue);
+  }
+  const invalid = [
+    { ...interval, default: 11 }, { ...interval, default: 29 },
+    { ...interval, default: '20' }, { ...interval, min: 29 },
+    { ...interval, values: [12, 20, 28] },
+    { values: [12], min: 12 }, { values: [12], max: 12 },
+    {}, { min: 12 }, { max: 28 },
+    { values: [] }, { values: null }, { values: [12, 12] },
+    { values: ['12'] }, { values: [12.5] }, { values: [1_000_001] },
+    { values: Array.from({ length: 33 }, (_, index) => index) },
+  ];
+  for (const option of invalid) {
+    const declaration = { id: 'size', label: 'Tamaño', type: 'integer', default: 12, ...option };
+    assert.throws(() => validateManifest({ ...template, options: [declaration] }), { code: 'INVALID_MANIFEST' });
+  }
 });
 
 test('rechaza versiones, campos desconocidos y valores incompatibles', () => {
@@ -75,7 +116,7 @@ test('rechaza traversal, rutas absolutas, alternativas Windows y URLs en todas l
     'a\\outside.mjs', 'a//outside.mjs', './server.mjs', 'file:///x.mjs', '%2e%2e/x.mjs', 'NUL.mjs']) {
     for (const key of ['server', 'web']) {
       const manifest = structuredClone(template);
-      manifest.entrypoints[key] = value;
+      manifest.entrypoints[key] = key === 'web' ? value.replace(/\.mjs$/, '.html') : value;
       assert.throws(() => validateManifest(manifest), { code: 'UNSAFE_PATH' });
     }
   }
@@ -96,7 +137,7 @@ test('rechaza JSON inválido, tamaño excesivo y archivos faltantes sin filtrar 
   }
   for (const change of [
     (m) => { m.entrypoints.server = 'missing.mjs'; },
-    (m) => { m.entrypoints.web = 'missing.mjs'; },
+    (m) => { m.entrypoints.web = 'missing.html'; },
     (m) => { m.analytics.profile = 'missing.json'; },
   ]) {
     const manifest = structuredClone(template);
@@ -148,7 +189,7 @@ test('catálogo público sin rutas de carga y APIs con copias defensivas', async
   assert.deepEqual(Object.keys(catalog[0]).sort(),
     ['id', 'name', 'version', 'description', 'category', 'capabilities', 'players', 'options'].sort());
   const serialized = JSON.stringify(catalog);
-  for (const forbidden of [root, 'server.mjs', 'web.mjs', 'profile.json', 'entrypoints', 'directory', 'paths']) {
+  for (const forbidden of [root, 'server.mjs', 'web.html', 'web.mjs', 'profile.json', 'entrypoints', 'directory', 'paths']) {
     assert.ok(!serialized.includes(forbidden));
   }
   catalog[0].options[0].values.push('mutated');
