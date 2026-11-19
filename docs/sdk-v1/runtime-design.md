@@ -7,10 +7,13 @@ EventSink local. La [Fase 2B.2A](phase-2b2a.md) implementa confirmaciones intern
 de estado/versiones/eventos de dominio con celda optativa. La [Fase 2B.2B](phase-2b2b.md)
 implementa dispatch JSON, expectedVersion e historial acotado de requestId.
 La [Fase 3A](phase-3a.md) conecta un EventSink al EventOutbox real con aceptación
-local de lotes y pruebas de fetcher simulado. HTTP, autorización y verificación
-de entrega contra Go/Scala reales siguen pendientes. El registro
+local de lotes y pruebas de fetcher simulado. La [Fase 3C](phase-3c.md) implementa
+bootstrap de confianza y API HTTP optativa, reutilizando el mismo Outbox histórico.
+El equipo reporta verificación manual PASSED del transporte 3B contra Go/Scala;
+el nuevo humo HTTP requiere su propia ejecución manual. Autorización de usuarios,
+web y migración de juegos siguen pendientes. El registro
 continúa almacenando solo metadatos, separado del loader y la fábrica.
-Las rutas HTTP, clases actuales, UI y EventOutbox mantienen su comportamiento.
+Las rutas HTTP históricas, clases actuales, UI y EventOutbox mantienen su comportamiento.
 
 ## Plugin y sesión
 
@@ -48,9 +51,9 @@ revisiones internas, pero nunca sustituyen `expectedVersion` público.
 `completed`, `rejected` o `dependency_failed`; `committed` indica si hubo al menos
 una transición confirmada. El host añade siempre el snapshot público vigente a
 la respuesta, incluso ante fallo posterior a una confirmación. Las reglas de
-confirmación y fallos se detallan abajo. Tamaños máximos, timeouts y traducción
-HTTP de errores se fijarán antes de integrar el runtime; no son garantías del
-servidor actual.
+confirmación y fallos se detallan abajo. Los límites de HTTP (16384 bytes, admisión
+64), códigos de error y timeout exclusivo de consulta analítica están definidos
+en [3C](phase-3c.md). No se impone cancelación/timeout de ejecución a dispatch.
 
 `finish` liberará timers y recursos del plugin y será idempotente. `pause` y
 `resume` existirán juntos solo si ambas capacidades son verdaderas; una repetición
@@ -66,8 +69,8 @@ Protocolo objetivo obligatorio. Los pasos de preparación y validación están
 implementados en 2A según el descriptor exacto de [phase-2a.md](phase-2a.md); la
 construcción de MATCH_STARTED y la activación local del paso 5 se implementan en
 2B.1. En 2B.2A se permite dominio mediante operaciones internas coordinadas. La
-entrega real a Go y endpoints públicos siguen pendientes; 2B.2B añade una fachada
-de datos del manager que utiliza esas mismas operaciones coordinadas:
+fachada de datos de 2B.2B utiliza esas mismas operaciones coordinadas y 3C la
+expone bajo `/api/sdk/` mediante habilitación explícita:
 
 1. El host valida opciones, asigna identidad y valida participantes contra
    `manifest.players` y `GamePlugin.initializationContract`. Esta declaración del
@@ -185,7 +188,8 @@ retira eventos ya aceptados. Se devuelve `outcome: dependency_failed`, `committe
 true`, un error saneado y recuperable cuando corresponda, y el snapshot con la
 versión vigente. Si no hubo confirmación, `committed` es false y el snapshot sigue
 sin cambios. No se presenta una transición confirmada como acción rechazada ni
-se oculta detrás de un error sin estado. La respuesta HTTP concreta queda futura.
+se oculta detrás de un error sin estado. En 3C ese resultado completo devuelve
+HTTP 200, incluso ante fallo parcial confirmado; los conflictos previos usan 409.
 
 Ejemplo de contrato para Gato: validar la casilla → confirmar jugada humana,
 MOVE_PLACED y datos con IA pendiente → consultar Prolog. Si Prolog falla, tablero
@@ -223,7 +227,8 @@ El Adapter de 2B.1 construye el sobre existente de GameStats sin cambiarlo:
 y opcionalmente `playerId` (el SDK incluye `gameVersion`). El host asigna ID de evento,
 tiempo UTC e identidad y conserva orden por partida. La entrega/reintentos mediante
 EventOutbox se conectan en 3A mediante OutboxEventSink: se prueba el Outbox real
-con un fetcher simulado; el script contra Go/Scala reales está preparado y no ejecutado.
+con un fetcher simulado. El equipo reporta PASSED de su ejecución manual de 3B;
+el nuevo humo HTTP 3C no se ejecuta automáticamente.
 Varios eventos de una misma transición requieren acceptBatch de lote completo,
 según [2B.2A](phase-2b2a.md); accept individual no ofrece esa garantía.
 No se envía el acumulado como si fuera incremento. Aceptación local
@@ -231,8 +236,9 @@ no equivale a entrega exactamente una vez; no se añade persistencia durable.
 
 Go seguirá validando y organizando eventos; Scala seguirá calculando estadísticas.
 El perfil opcional del paquete no instala código Scala, no modifica contratos de
-Go y no garantiza métricas para un juego nuevo. Las consultas a resultados y al
-resumen pasarán por una fachada del host, pendiente de diseño e integración.
+Go y no garantiza métricas para un juego nuevo. La fachada HTTP 3C consulta
+resultados mediante Go tras comprobar entrega local y detectar cambios de prefijo;
+no incorpora un resumen/dashboard SDK nuevo ni calcula estadísticas en JS.
 
 ## Web y límites v1
 
@@ -255,11 +261,11 @@ entregar exactamente tres juegos funcionales. Los fixtures quedan fuera de
 | Patrón | Decisión | Estado en esta fase |
 | --- | --- | --- |
 | Registry + Factory | El registro descubre identidades y metadatos sin condiciones por `gameId`; una fábrica separada prepara cada sesión. Evita acoplar catálogo y reglas. | Registry, Loader y preparación de Factory implementados en 2A. |
-| Adapter | Construye el sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Ciclo de vida en 2B.1; dominio en 2B.2A; OutboxEventSink y lotes locales en 3A. Go/Scala real pendiente de verificación manual. |
+| Adapter | Construye el sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Ciclo de vida en 2B.1; dominio en 2B.2A; OutboxEventSink y lotes locales en 3A. Humo HTTP 3C pendiente de ejecución manual. |
 | Observer | El host observa hechos emitidos por la sesión y desacopla reglas de consumidores como transporte o UI. | Futuro; sin bus nuevo. |
 | State | Ciclo de vida centralizado y confirmación explícita para evitar autoridades contradictorias. | prepared/running/closing/finished y coordinación interna de dominio implementados; pausa pública pendiente. Ninguna clase actual se reescribe. |
-| Dependency Injection | Contexto y servicios por sesión permiten límites explícitos y sustituciones en pruebas. | Contexto mínimo, celda optativa y sink inyectable implementados; servicios externos y transporte real pendientes. |
-| Facade | Una interfaz del host para catálogo, sesiones y consultas GameStats evita que web/plugins coordinen servicios internos. | Catálogo y manager de preparación/lectura/cierre implementados; integración GameStats futura. |
+| Dependency Injection | Contexto y servicios por sesión permiten límites explícitos y sustituciones en pruebas. | Contexto mínimo, celda, sink, bootstrap y transporte inyectables implementados; no se exponen dependencias a clientes. |
+| Facade | Una interfaz del host para catálogo, sesiones y consultas GameStats evita que web/plugins coordinen servicios internos. | API HTTP genérica 3C con catálogo confiable, acciones y consulta de resultados Go; autorización y UI pendientes. |
 
 La siguiente fase deberá revisar primero carga confiable, fábrica, coordinación
 de cierre, cuotas y errores, y después migrar un juego de forma incremental.

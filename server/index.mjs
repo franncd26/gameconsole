@@ -5,6 +5,8 @@ import path from "node:path";
 import { CATALOG, TicTacToe, Snake, Racing, GameError } from "./games.mjs";
 import { EventOutbox } from "./outbox.mjs";
 import { decide } from "./prolog.mjs";
+import { connectSDK, prepareSDKFromEnvironment } from "./sdk/bootstrap.mjs";
+import { createSDKHTTP } from "./sdk/http-api.mjs";
 
 const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const types = {
@@ -16,9 +18,16 @@ const types = {
 export function createApp({
   statsURL = process.env.GAMESTATS_URL || "http://127.0.0.1:8080",
   ai = decide,
+  sdk,
+  statsFetcher = fetch,
+  sdkHTTP = {},
 } = {}) {
   const matches = new Map(),
-    outbox = new EventOutbox(statsURL);
+    outbox = new EventOutbox(statsURL, { fetcher: statsFetcher });
+  const sdkRuntime = connectSDK(sdk, outbox);
+  const handleSDK = createSDKHTTP(sdkRuntime, {
+    ...sdkHTTP, outbox, statsURL, fetcher: statsFetcher,
+  });
   const json = (res, code, body) => {
     res.writeHead(code, {
       "Content-Type": "application/json; charset=utf-8",
@@ -41,7 +50,7 @@ export function createApp({
   };
   const upstream = async (route) => {
     try {
-      const r = await fetch(statsURL + route, {
+      const r = await statsFetcher(statsURL + route, {
         signal: AbortSignal.timeout(12000),
       });
       if (!r.ok)
@@ -68,6 +77,8 @@ export function createApp({
       );
       const url = new URL(req.url, "http://localhost"),
         p = url.pathname;
+      if (p === "/api/sdk" || p.startsWith("/api/sdk/"))
+        return await handleSDK(req, res, url);
       if (
         p.startsWith("/api/") &&
         req.headers.origin &&
@@ -162,31 +173,39 @@ export function createApp({
       });
     }
   });
-  return { server, matches, outbox };
+  return { server, matches, outbox, sdk: sdkRuntime };
 }
 if (
   process.argv[1] &&
   path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)
 ) {
-  const app = createApp();
-  const port = Number(process.env.PORT || 3000);
-  app.server.listen(port, process.env.HOST || "127.0.0.1", () =>
-    console.log(`GameConsole: http://127.0.0.1:${port}`),
-  );
-  for (const signal of ["SIGINT", "SIGTERM"])
-    process.on(signal, async () => {
-      try {
-        await Promise.all(
-          [...app.matches.values()].map((m) =>
-            m.exclusive(() => m.finish("shutdown")),
-          ),
-        );
-        await app.outbox.flush(5000);
-      } catch {
-        console.error("Quedaron eventos sin entregar al detener el servidor.");
-      }
-      app.outbox.stop();
-      app.server.close(() => process.exit());
-      setTimeout(() => process.exit(1), 2000).unref();
-    });
+  let app;
+  try { app = createApp({ sdk: await prepareSDKFromEnvironment() }); }
+  catch (error) {
+    console.error(`SDK bootstrap: ${error.code ?? "SDK_FAILURE"}; no se inicia el servidor.`);
+    process.exitCode = 1;
+  }
+  if (app) {
+    const port = Number(process.env.PORT || 3000);
+    app.server.listen(port, process.env.HOST || "127.0.0.1", () =>
+      console.log(`GameConsole: http://127.0.0.1:${port}`),
+    );
+    for (const signal of ["SIGINT", "SIGTERM"])
+      process.on(signal, async () => {
+        try {
+          await Promise.all(
+            [...app.matches.values()].map((m) =>
+              m.exclusive(() => m.finish("shutdown")),
+            ),
+          );
+          await app.sdk?.shutdown();
+          await app.outbox.flush(5000);
+        } catch {
+          console.error("Quedaron eventos sin entregar al detener el servidor.");
+        }
+        app.outbox.stop();
+        app.server.close(() => process.exit());
+        setTimeout(() => process.exit(1), 2000).unref();
+      });
+  }
 }

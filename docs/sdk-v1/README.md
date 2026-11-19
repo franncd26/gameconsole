@@ -1,4 +1,4 @@
-# GameConsole SDK v1 — Fases 0, 1, 2A, 2B y 3A
+# GameConsole SDK v1 — Fases 0–3C
 
 Esta carpeta define el contrato para una evolución incremental. **Están
 implementados manifiestos, registro y la infraestructura local de carga confiable,
@@ -6,11 +6,12 @@ preparación y administración de sesiones de Fase 2A, y activación/cierre con 
 de ciclo de vida mediante EventSink inyectable de Fase 2B.1, y confirmación interna
 de datos/eventos/versiones de Fase 2B.2A y fachada dispatch JSON con historial
 acotado de Fase 2B.2B, y adaptador EventSink → EventOutbox con lotes de Fase 3A**.
-El transporte se prueba con fetcher simulado; el humo Go/Scala queda manual. El servidor
-HTTP actual no importa estos módulos; su catálogo conserva Gato, Snake y Circuito.
-No hay juegos migrados, endpoints de acciones HTTP, autenticación, transporte real a Go,
-iframe, cargador web ni integración real nueva con
-Scala. El fixture de `test/fixtures/sdk-v1/example/` no es un cuarto juego.
+La [Fase 3C](phase-3c.md) añade bootstrap explícito de confianza y API optativa
+`/api/sdk/`, compartiendo el Outbox histórico. El equipo reporta PASSED del humo
+de transporte 3B contra Go/Scala; el nuevo humo HTTP continúa pendiente de
+ejecución manual. Las pruebas automatizadas usan fetcher simulado.
+El catálogo histórico conserva Gato, Snake y Circuito. No hay juegos migrados,
+autenticación, iframe ni cargador web. Los fixtures no son un cuarto juego.
 
 - [Manifiesto normativo v1](manifest.md): campos, límites y reglas de archivos.
 - [Contrato diseñado de runtime y patrones](runtime-design.md): trabajo futuro.
@@ -19,6 +20,7 @@ Scala. El fixture de `test/fixtures/sdk-v1/example/` no es un cuarto juego.
 - [Fase 2B.2A implementada](phase-2b2a.md): celda optativa, confirmaciones, lotes y fallos parciales.
 - [Fase 2B.2B implementada](phase-2b2b.md): dispatch JSON, expectedVersion, replay e historial FIFO.
 - [Fase 3A implementada](phase-3a.md): OutboxEventSink, enqueueBatch, pruebas locales y humo manual pendiente.
+- [Fase 3C implementada](phase-3c.md): bootstrap confiable, rutas HTTP, límites y humo HTTP manual.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada
@@ -38,7 +40,7 @@ const paquete = registry.get('sdk-example'); // undefined si no existe
 const publico = registry.publicCatalog();
 ```
 
-El fragmento ilustra llamadas; no se importa desde el servidor en esta fase.
+El fragmento ilustra APIs internas; el bootstrap 3C las compone antes del servidor.
 `discoverPlugins()` usa por defecto `plugins/` en la raíz de este repositorio,
 independientemente del directorio de trabajo. No se crea esa carpeta ni se instala
 ningún paquete productivo ahora. Las rutas configurables se reciben como strings;
@@ -74,14 +76,15 @@ La raíz ausente (`ENOENT`) devuelve catálogo vacío y ningún error. Otros fal
 al inspeccionar la raíz producen `DISCOVERY_IO` con `candidate: null`.
 Cada paquete rechazado se aísla y se continúa con los restantes.
 
-## Catálogo obligatorio en producción — contrato de integración futuro
+## Catálogo obligatorio y bootstrap
 
 El resultado de discovery es un diagnóstico utilizable, **no una autorización de
 arranque**. Se conserva la política de primer paquete válido para inspección y
 pruebas. Que el registro contenga un ID no resuelve un conflicto si existe además
 un rechazo `DUPLICATE_ID`. No se elegirá silenciosamente un ganador en producción.
 
-Antes de publicar rutas o aceptar partidas, el futuro bootstrap productivo deberá:
+Antes de publicar rutas o aceptar partidas SDK, el bootstrap 3C revisa errores e
+IDs confiables requeridos. Para el futuro despliegue académico migrado se deberá:
 
 1. Ejecutar discovery y revisar todos sus errores. Cualquier rechazo, incluidos
    duplicados y errores de lectura, bloqueará el arranque productivo con un
@@ -96,8 +99,11 @@ Antes de publicar rutas o aceptar partidas, el futuro bootstrap productivo deber
 El conjunto pertenece a la configuración del despliegue, no al SDK genérico ni a
 condiciones por juego en el registro. Esto permite N paquetes en otros despliegues.
 La comprobación será previa a la apertura del servidor, sin necesidad de cambiar
-la API del discovery. **Ese bootstrap no está implementado ni conectado al HTTP
-actual**. No deben desplegarse los fixtures como plugins productivos. No se cambia
+la API del discovery. **3C implementa esa comprobación de errores y faltantes para
+la lista confiable explícita**, permite otros paquetes válidos no autorizados y
+no impone todavía el catálogo académico migrado de tres juegos. La API es optativa
+y de desarrollo; véase [configuración exacta](phase-3c.md). No deben desplegarse
+los fixtures como plugins productivos. No se cambia
 el comportamiento de directorio ausente ni la política actual de registro.
 
 Códigos: `INVALID_JSON`, `INVALID_MANIFEST`, `INCOMPATIBLE_VERSION`, `UNSAFE_PATH`,
@@ -134,6 +140,7 @@ node --check test/fixtures/sdk-actions/plugin.mjs
 node --test test/sdk-v1.test.mjs test/sdk-runtime.test.mjs test/sdk-lifecycle.test.mjs test/sdk-transitions.test.mjs test/sdk-actions.test.mjs
 ```
 
+La verificación HTTP/Outbox completa de 3C está en [phase-3c.md](phase-3c.md).
 No usar `npm test` para esta revisión acotada: incluye pruebas históricas con
 servicios y Prolog. La nueva prueba solo usa memoria y archivos temporales; no
 ejecuta los entrypoints trampa del fixture. El caso de symlink/junction informa
