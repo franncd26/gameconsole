@@ -22,7 +22,7 @@ services:
       SCALA_SERVICE_URL: http://scala-analysis:9000
     ports: ["127.0.0.1:${GAMESTATS_PORT:-8080}:8080"]
     depends_on:
-      scala-analysis: {condition: service_healthy}
+      scala-analysis: { condition: service_healthy }
     read_only: true
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -33,7 +33,7 @@ services:
       GAMESTATS_URL: http://go-ingestion:8080
     ports: ["127.0.0.1:${PORT:-3000}:3000"]
     depends_on:
-      go-ingestion: {condition: service_healthy}
+      go-ingestion: { condition: service_healthy }
     init: true
     read_only: true
     tmpfs: [/tmp]

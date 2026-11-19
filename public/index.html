@@ -1,17 +1,213 @@
 <!doctype html>
-<html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#11121a"><title>GameConsole · Tu próxima partida</title><link rel="stylesheet" href="/style.css"><script type="module" src="/app.mjs"></script></head>
-<body>
-<aside class="sidebar"><a class="brand" href="/" aria-label="GameConsole inicio"><span class="brand-icon">g<span>c</span></span><span>game<span>console</span><small>PLAY. THINK. REPEAT.</small></span></a><div class="nav-label">TU ESPACIO</div><nav><button class="nav active" data-view="library"><span>▦</span> Biblioteca</button><button class="nav" data-view="stats"><span>▥</span> Estadísticas</button></nav><div class="sidebar-bottom"><div class="course-badge">LP</div><div>Lenguajes de Programación<small>Francisco & Justin · Proyecto 2</small></div></div></aside>
-<div class="shell"><header class="topbar"><div id="breadcrumb">Tu espacio <span>/</span> Biblioteca</div><div class="connection"><span id="connection-dot" class="dot"></span><span id="connection-text">Conectando con GameStats</span></div></header>
-<main>
-<section id="library-view"><div class="eyebrow">ELIGE TU SIGUIENTE RETO</div><div class="page-title"><h1>Una consola.<br><span>Tres formas de jugar.</span></h1><span class="edition">COLECCIÓN 01 <span>●</span> 2026</span></div><p class="intro">Estrategia, reflejos y velocidad. Abre una partida y deja que los números cuenten la historia.</p>
-<div class="hero"><div class="hero-copy"><span class="pill">JUGADOR VS. INTELIGENCIA</span><h2>Piensa tu jugada.<br>Prolog ya piensa la suya.</h2><p>Un tablero de nueve casillas. Un rival que explora cada posibilidad. ¿Puedes encontrar el empate perfecto?</p><button class="primary" data-start="tic-tac-toe">Jugar Gato <span>＋</span></button><div class="hero-meta">MINIMAX EN PROLOG <i></i> PARTIDAS INDEPENDIENTES</div></div><div class="hero-art" aria-hidden="true"><div class="art-grid"><b>×</b><b>○</b><b>×</b><b>○</b><b class="art-highlight">×</b><b></b><b></b><b>○</b><b>×</b></div><span class="art-label">TU TURNO DE PENSAR</span></div></div>
-<div class="section-title"><h2>La biblioteca <span>03</span></h2><span>Tres juegos. Un mismo lugar.</span></div>
-<div class="game-grid"><article class="game-card violet"><div class="card-art gato-art" aria-hidden="true"><span>×</span><span>○</span><span>×</span></div><div class="card-body"><div class="card-tag">ESTRATEGIA <span>VS. PROLOG</span></div><h3>Gato</h3><p>Anticipa, bloquea y encuentra tu oportunidad en cada casilla.</p><button class="card-play" data-start="tic-tac-toe">Iniciar partida <span>＋</span></button></div></article><article class="game-card lime"><div class="card-art snake-art" aria-hidden="true"><div class="pixel-snake"><i></i><i></i><i></i><i></i><i></i><i></i></div><span class="apple">◆</span></div><div class="card-body"><div class="card-tag">REFLEJOS <span>UN JUGADOR</span></div><h3>Snake</h3><p>Sigue creciendo. Solo evita convertirte en tu propio obstáculo.</p><button class="card-play" data-start="snake">Iniciar partida <span>＋</span></button></div></article><article class="game-card orange"><div class="card-art race-art" aria-hidden="true"><div class="road-line"></div><div class="car-symbol">▰</div><span class="race-number">03</span></div><div class="card-body"><div class="card-tag">VELOCIDAD <span>TRES VUELTAS</span></div><h3>Circuito</h3><p>Domina los carriles, esquiva obstáculos y completa el recorrido.</p><button class="card-play" data-start="racing">Iniciar partida <span>＋</span></button></div></article></div>
-<div class="section-title sessions-title"><h2>Tus partidas <span id="session-count">00</span></h2><button class="text-button" id="refresh-sessions">Actualizar</button></div><div id="sessions" class="sessions"><p class="empty">El siguiente reto empieza contigo. Abre tu primera partida.</p></div>
-</section>
-<section id="stats-view" hidden><div class="eyebrow">CADA PARTIDA CUENTA</div><h1>Detrás del juego,<br><span>están los números.</span></h1><p class="intro">Resultados consultados directamente a GameStats. Se actualizan mientras juegas.</p><div class="stat-grid" id="stats-totals"></div><div class="section-title"><h2>Por juego</h2><span id="stats-updated">Esperando datos</span></div><div id="stats-games" class="stats-games"></div><div class="stats-note">Las instancias cuentan partidas iniciadas, incluidas las activas y abandonadas. Los datos corresponden a la sesión actual de GameStats y se eliminan al reiniciar ese servicio.</div></section>
-<section id="play-view" hidden><button class="text-button" id="back-library">‹ Volver a biblioteca</button><div class="play-header"><div><div class="eyebrow" id="play-tag"></div><h1 id="play-title"></h1></div><div class="play-actions"><button class="secondary" id="pause-game">Pausar</button><button class="secondary" id="new-tab">Abrir en otra pestaña</button><button class="danger" id="finish-game">Finalizar</button></div></div><div class="play-layout"><div class="play-stage" id="play-stage"></div><aside class="play-info"><span class="eyebrow">EN ESTA PARTIDA</span><h2 id="play-status">Tu turno</h2><p id="play-instructions"></p><div id="play-score"></div><div id="ai-explanation"></div><div class="match-code" id="match-code"></div><div id="delivery-status" class="delivery"></div><button class="primary" id="play-again" hidden>Jugar de nuevo</button><button class="secondary" id="retry-ai" hidden>Reintentar IA</button><div class="live-results"><h3>GameStats en vivo</h3><div id="match-results">Esperando acontecimientos…</div></div></aside></div></section>
-<div id="notice" role="status" aria-live="polite" hidden></div>
-<footer><span>Menos espera. Más juego.</span><span>POO + PROLOG + GAMESTATS</span></footer>
-</main></div></body></html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="theme-color" content="#11121a" />
+    <title>GameConsole · Tu próxima partida</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script type="module" src="/app.mjs"></script>
+  </head>
+  <body>
+    <aside class="sidebar">
+      <a class="brand" href="/" aria-label="GameConsole inicio"
+        ><span class="brand-icon">g<span>c</span></span
+        ><span
+          >game<span>console</span><small>PLAY. THINK. REPEAT.</small></span
+        ></a
+      >
+      <div class="nav-label">TU ESPACIO</div>
+      <nav>
+        <button class="nav active" data-view="library">
+          <span>▦</span> Biblioteca</button
+        ><button class="nav" data-view="stats">
+          <span>▥</span> Estadísticas
+        </button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="course-badge">LP</div>
+        <div>
+          Lenguajes de Programación<small
+            >Francisco & Justin · Proyecto 2</small
+          >
+        </div>
+      </div>
+    </aside>
+    <div class="shell">
+      <header class="topbar">
+        <div id="breadcrumb">Tu espacio <span>/</span> Biblioteca</div>
+        <div class="connection">
+          <span id="connection-dot" class="dot"></span
+          ><span id="connection-text">Conectando con GameStats</span>
+        </div>
+      </header>
+      <main>
+        <section id="library-view">
+          <div class="eyebrow">ELIGE TU SIGUIENTE RETO</div>
+          <div class="page-title">
+            <h1>Una consola.<br /><span>Tres formas de jugar.</span></h1>
+            <span class="edition">COLECCIÓN 01 <span>●</span> 2026</span>
+          </div>
+          <p class="intro">
+            Estrategia, reflejos y velocidad. Abre una partida y deja que los
+            números cuenten la historia.
+          </p>
+          <div class="hero">
+            <div class="hero-copy">
+              <span class="pill">JUGADOR VS. INTELIGENCIA</span>
+              <h2>Piensa tu jugada.<br />Prolog ya piensa la suya.</h2>
+              <p>
+                Un tablero de nueve casillas. Un rival que explora cada
+                posibilidad. ¿Puedes encontrar el empate perfecto?
+              </p>
+              <button class="primary" data-start="tic-tac-toe">
+                Jugar Gato <span>＋</span>
+              </button>
+              <div class="hero-meta">
+                MINIMAX EN PROLOG <i></i> PARTIDAS INDEPENDIENTES
+              </div>
+            </div>
+            <div class="hero-art" aria-hidden="true">
+              <div class="art-grid">
+                <b>×</b><b>○</b><b>×</b><b>○</b><b class="art-highlight">×</b
+                ><b></b><b></b><b>○</b><b>×</b>
+              </div>
+              <span class="art-label">TU TURNO DE PENSAR</span>
+            </div>
+          </div>
+          <div class="section-title">
+            <h2>La biblioteca <span>03</span></h2>
+            <span>Tres juegos. Un mismo lugar.</span>
+          </div>
+          <div class="game-grid">
+            <article class="game-card violet">
+              <div class="card-art gato-art" aria-hidden="true">
+                <span>×</span><span>○</span><span>×</span>
+              </div>
+              <div class="card-body">
+                <div class="card-tag">ESTRATEGIA <span>VS. PROLOG</span></div>
+                <h3>Gato</h3>
+                <p>
+                  Anticipa, bloquea y encuentra tu oportunidad en cada casilla.
+                </p>
+                <button class="card-play" data-start="tic-tac-toe">
+                  Iniciar partida <span>＋</span>
+                </button>
+              </div>
+            </article>
+            <article class="game-card lime">
+              <div class="card-art snake-art" aria-hidden="true">
+                <div class="pixel-snake">
+                  <i></i><i></i><i></i><i></i><i></i><i></i>
+                </div>
+                <span class="apple">◆</span>
+              </div>
+              <div class="card-body">
+                <div class="card-tag">REFLEJOS <span>UN JUGADOR</span></div>
+                <h3>Snake</h3>
+                <p>
+                  Sigue creciendo. Solo evita convertirte en tu propio
+                  obstáculo.
+                </p>
+                <button class="card-play" data-start="snake">
+                  Iniciar partida <span>＋</span>
+                </button>
+              </div>
+            </article>
+            <article class="game-card orange">
+              <div class="card-art race-art" aria-hidden="true">
+                <div class="road-line"></div>
+                <div class="car-symbol">▰</div>
+                <span class="race-number">03</span>
+              </div>
+              <div class="card-body">
+                <div class="card-tag">VELOCIDAD <span>TRES VUELTAS</span></div>
+                <h3>Circuito</h3>
+                <p>
+                  Domina los carriles, esquiva obstáculos y completa el
+                  recorrido.
+                </p>
+                <button class="card-play" data-start="racing">
+                  Iniciar partida <span>＋</span>
+                </button>
+              </div>
+            </article>
+          </div>
+          <div class="section-title sessions-title">
+            <h2>Tus partidas <span id="session-count">00</span></h2>
+            <button class="text-button" id="refresh-sessions">
+              Actualizar
+            </button>
+          </div>
+          <div id="sessions" class="sessions">
+            <p class="empty">
+              El siguiente reto empieza contigo. Abre tu primera partida.
+            </p>
+          </div>
+        </section>
+        <section id="stats-view" hidden>
+          <div class="eyebrow">CADA PARTIDA CUENTA</div>
+          <h1>Detrás del juego,<br /><span>están los números.</span></h1>
+          <p class="intro">
+            Resultados consultados directamente a GameStats. Se actualizan
+            mientras juegas.
+          </p>
+          <div class="stat-grid" id="stats-totals"></div>
+          <div class="section-title">
+            <h2>Por juego</h2>
+            <span id="stats-updated">Esperando datos</span>
+          </div>
+          <div id="stats-games" class="stats-games"></div>
+          <div class="stats-note">
+            Las instancias cuentan partidas iniciadas, incluidas las activas y
+            abandonadas. Los datos corresponden a la sesión actual de GameStats
+            y se eliminan al reiniciar ese servicio.
+          </div>
+        </section>
+        <section id="play-view" hidden>
+          <button class="text-button" id="back-library">
+            ‹ Volver a biblioteca
+          </button>
+          <div class="play-header">
+            <div>
+              <div class="eyebrow" id="play-tag"></div>
+              <h1 id="play-title"></h1>
+            </div>
+            <div class="play-actions">
+              <button class="secondary" id="pause-game">Pausar</button
+              ><button class="secondary" id="new-tab">
+                Abrir en otra pestaña</button
+              ><button class="danger" id="finish-game">Finalizar</button>
+            </div>
+          </div>
+          <div class="play-layout">
+            <div class="play-stage" id="play-stage"></div>
+            <aside class="play-info">
+              <span class="eyebrow">EN ESTA PARTIDA</span>
+              <h2 id="play-status">Tu turno</h2>
+              <p id="play-instructions"></p>
+              <div id="play-score"></div>
+              <div id="ai-explanation"></div>
+              <div class="match-code" id="match-code"></div>
+              <div id="delivery-status" class="delivery"></div>
+              <button class="primary" id="play-again" hidden>
+                Jugar de nuevo</button
+              ><button class="secondary" id="retry-ai" hidden>
+                Reintentar IA
+              </button>
+              <div class="live-results">
+                <h3>GameStats en vivo</h3>
+                <div id="match-results">Esperando acontecimientos…</div>
+              </div>
+            </aside>
+          </div>
+        </section>
+        <div id="notice" role="status" aria-live="polite" hidden></div>
+        <footer>
+          <span>Menos espera. Más juego.</span
+          ><span>POO + PROLOG + GAMESTATS</span>
+        </footer>
+      </main>
+    </div>
+  </body>
+</html>
