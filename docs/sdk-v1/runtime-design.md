@@ -3,8 +3,9 @@
 Este documento describe el runtime objetivo. La [Fase 2A](phase-2a.md) concreta e
 implementa carga confiable, opciones, preparación y administración local de
 sesiones preparadas. La [Fase 2B.1](phase-2b1.md) añade activación y cierre con un
-EventSink local. Acciones públicas, eventos de dominio y coordinador de
-transiciones siguen siendo diseño para fases posteriores. El registro
+EventSink local. La [Fase 2B.2A](phase-2b2a.md) implementa confirmaciones internas
+de estado/versiones/eventos de dominio con celda optativa. Acciones públicas,
+deduplicación y transporte real siguen siendo diseño para fases posteriores. El registro
 continúa almacenando solo metadatos, separado del loader y la fábrica.
 Las rutas HTTP, clases actuales, UI y EventOutbox mantienen su comportamiento.
 
@@ -34,7 +35,7 @@ la única autoridad de `version` y `state`**: versión entera segura no negativa
 creciente por transición confirmada; estado `running`, `paused` o `finished`.
 El plugin es la única autoridad de sus datos internos (`GameData`, objeto JSON),
 como tablero, turno, puntuación o una decisión de IA pendiente. Su `getSnapshot`
-devuelve una copia de esos datos, sin mutarlos ni emitir eventos. El host compone
+devuelve una copia o representación inmutable de esos datos, sin mutarlos ni emitir eventos. El host compone
 el sobre público, sin mantener otra copia mutable como motor de reglas. El plugin
 no devuelve ni controla una segunda versión pública o un segundo ciclo de vida;
 datos como `awaitingAI` no son un estado alternativo de la partida. Puede tener
@@ -61,7 +62,8 @@ recursos o limpia su estado. Terminar por reglas se solicita con `finishMatch`.
 Protocolo objetivo obligatorio. Los pasos de preparación y validación están
 implementados en 2A según el descriptor exacto de [phase-2a.md](phase-2a.md); la
 construcción de MATCH_STARTED y la activación local del paso 5 se implementan en
-2B.1. La entrega real a Go y habilitación de acciones/dominio siguen pendientes:
+2B.1. En 2B.2A se permite dominio mediante operaciones internas coordinadas. La
+entrega real a Go y habilitación de acciones públicas siguen pendientes:
 
 1. El host valida opciones, asigna identidad y valida participantes contra
    `manifest.players` y `GamePlugin.initializationContract`. Esta declaración del
@@ -89,7 +91,8 @@ construcción de MATCH_STARTED y la activación local del paso 5 se implementan 
    dominio. La primera transición posterior confirmada incrementa la versión.
    El transporte remoto no tiene que haber entregado el evento para habilitarla.
    En 2B.1 solo se habilita el ciclo de vida running; las acciones y eventos de
-   dominio permanecerán deshabilitados hasta su coordinador en 2B.2.
+   dominio permanecían deshabilitados. 2B.2A permite únicamente operaciones
+   internas con confirmación explícita; no habilita dispatch público.
 
 Cualquier fallo antes de aceptar el inicio impide publicar la instancia y emitir
 eventos de dominio; el host limpia la sesión preparada con `finish` en modo de
@@ -106,8 +109,10 @@ El host inyectará un contexto por partida:
 | Miembro conceptual | Responsabilidad |
 | --- | --- |
 | `gameId`, `gameVersion`, `matchId`, `players` | Identidad y participantes asignados/validados por el host, inmutables; nunca proceden de acciones sin validar. |
-| `emitEvent({type,data,playerId?})` | Promise de aceptación local de un evento de dominio, sin promesa de entrega remota. El host valida tipo/datos y autoría del participante; solo se permite después de activar la sesión y como parte de una transición coordinada. |
-| `finishMatch({reason,data?})` | Promise que solicita cierre al coordinador del host, una sola vez. No sustituye ni permite fabricar MATCH_FINISHED desde el plugin. |
+| `createState(initialData)` | Optativo en 2B.2A: celda JSON inmutable con read(), creada una vez durante preparación. El plugin decide reglas y datos; el host coordina su reemplazo. |
+| `confirmTransition({data,events})` | 2B.2A: valida candidato y eventos, espera aceptación local y confirma versión. Solo dentro de una operación interna running. |
+| `emitEvent({type,data,playerId?})` | Conservado como guardia, no publica independientemente. Los eventos de dominio se incluyen en confirmTransition para no separarlos del estado. |
+| `finishMatch({reason})` | Dentro de una operación, Promise de recepción de intención; el cierre se procesa al salir sin espera recursiva. No permite fabricar MATCH_FINISHED. data adicional queda pendiente. |
 | `logger` | Fachada `debug/info/warn/error(message, fields?)` contextualizada por partida; sin credenciales ni datos sensibles. |
 | `signal` | `AbortSignal` para cancelación y limpieza; no equivale a una pausa. |
 | `services` | Objeto de servicios expresamente autorizados por el host para ese plugin. Sin credenciales globales ni objetos de servidor. |
@@ -163,8 +168,8 @@ de confirmarlos y asigna la siguiente versión pública; una consulta no debe ve
 datos de una transición como confirmados con la versión anterior. El plugin no
 puede enviar eventos desvinculados de una transición ni fabricar versiones.
 También puede confirmarse una transición sin eventos. El mecanismo concreto de
-esta coordinación se especificará al implementar el runtime; no se añade ahora
-una API de transacciones o persistencia.
+esta coordinación se implementa en 2B.2A con candidatos inmutables y aceptación
+local, incluidos lotes opcionales. No es una API de transacciones durables.
 
 Después de una confirmación, un fallo de una dependencia no deshace los datos ni
 retira eventos ya aceptados. Se devuelve `outcome: dependency_failed`, `committed:
@@ -201,13 +206,16 @@ reglas, por ejemplo incrementos de puntos, y solicita terminar mediante
 `finishMatch`. La solicitud de término durante `dispatch` se coordinará al salir
 de la operación para no esperar recursivamente la misma cola; la limpieza
 `session.finish` no volverá a llamar a `finishMatch`. El protocolo detallado de
-errores de limpieza y aceptación de eventos queda por implementar con el runtime.
+errores de limpieza y aceptación de eventos de ciclo de vida se implementa en
+2B.1, y el cierre solicitado desde operación se coordina en 2B.2A.
 
 El Adapter de 2B.1 construye el sobre existente de GameStats sin cambiarlo:
 `schemaVersion: 1`, `eventId`, `timestamp`, `gameId`, `matchId`, `type`, `data`,
 y opcionalmente `playerId` (el SDK incluye `gameVersion`). El host asigna ID de evento,
 tiempo UTC e identidad y conserva orden por partida. La entrega/reintentos mediante
 EventOutbox siguen pendientes: por ahora solo se prueba un EventSink en memoria.
+Varios eventos de una misma transición requieren acceptBatch de lote completo,
+según [2B.2A](phase-2b2a.md); accept individual no ofrece esa garantía.
 No se envía el acumulado como si fuera incremento. Aceptación local
 no equivale a entrega exactamente una vez; no se añade persistencia durable.
 
@@ -237,10 +245,10 @@ entregar exactamente tres juegos funcionales. Los fixtures quedan fuera de
 | Patrón | Decisión | Estado en esta fase |
 | --- | --- | --- |
 | Registry + Factory | El registro descubre identidades y metadatos sin condiciones por `gameId`; una fábrica separada prepara cada sesión. Evita acoplar catálogo y reglas. | Registry, Loader y preparación de Factory implementados en 2A. |
-| Adapter | Construye el sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Ciclo de vida y construcción pura implementados en 2B.1; publicación de dominio y conexión EventOutbox pendientes. |
+| Adapter | Construye el sobre GameStats v1 y centraliza identidad/tiempo, sin llevar estadísticas a JS. | Ciclo de vida en 2B.1; publicación interna coordinada de dominio en 2B.2A. Conexión EventOutbox pendiente. |
 | Observer | El host observa hechos emitidos por la sesión y desacopla reglas de consumidores como transporte o UI. | Futuro; sin bus nuevo. |
-| State | Ciclo de vida centralizado para evitar que cada plugin redefina transiciones comunes. | prepared/running/closing/finished implementados para ciclo de vida local; pausa y transiciones de dominio pendientes. Ninguna clase actual se reescribe. |
-| Dependency Injection | Contexto y servicios por sesión permiten límites explícitos y sustituciones en pruebas. | Contexto mínimo de 2A implementado; servicios y eventos siguen pendientes. |
+| State | Ciclo de vida centralizado y confirmación explícita para evitar autoridades contradictorias. | prepared/running/closing/finished y coordinación interna de dominio implementados; pausa pública pendiente. Ninguna clase actual se reescribe. |
+| Dependency Injection | Contexto y servicios por sesión permiten límites explícitos y sustituciones en pruebas. | Contexto mínimo, celda optativa y sink inyectable implementados; servicios externos y transporte real pendientes. |
 | Facade | Una interfaz del host para catálogo, sesiones y consultas GameStats evita que web/plugins coordinen servicios internos. | Catálogo y manager de preparación/lectura/cierre implementados; integración GameStats futura. |
 
 La siguiente fase deberá revisar primero carga confiable, fábrica, coordinación

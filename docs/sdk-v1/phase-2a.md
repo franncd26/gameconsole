@@ -3,6 +3,8 @@
 Este documento conserva el alcance auditado de 2A. Las extensiones vigentes de
 activación/cierre, EventSink y contexto se describen en [Fase 2B.1](phase-2b1.md).
 Las interfaces de preparación se conservan; las diferencias están indicadas allí.
+La [Fase 2B.2A](phase-2b2a.md) agrega una celda de estado optativa y coordinación
+interna; las sesiones anteriores no tienen que declararla para seguir usando 2A.
 
 Se implementan carga confiable, opciones, preparación declarativa y administración
 de sesiones preparadas. No se activa el runtime de acciones ni se emiten eventos.

@@ -50,7 +50,7 @@ export class GameEventAdapter {
     return this.#build('MATCH_FINISHED', { reason });
   }
 
-  /** Validation/building only; domain publication is deferred to Phase 2B.2. */
+  /** Builds a domain envelope; publication belongs exclusively to the host coordinator. */
   createDomainEvent(input) {
     const descriptor = copyJSON(input, 'INVALID_EVENT');
     requireSDK(isObject(descriptor) && Object.hasOwn(descriptor, 'type') && Object.hasOwn(descriptor, 'data')

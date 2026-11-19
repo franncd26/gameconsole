@@ -1,5 +1,9 @@
 # Fase 2B.1 — activación y cierre con aceptación local
 
+Referencia del alcance auditado de 2B.1. La [Fase 2B.2A](phase-2b2a.md) añade
+coordinación de dominio optativa y la capacidad opcional acceptBatch del sink;
+se conservan los métodos y pruebas de ciclo de vida descritos aquí.
+
 Se conserva `create` como preparación y se añaden `activate` y `discard`. Solo
 se implementan eventos de ciclo de vida y transporte mediante una interfaz
 inyectable; las pruebas utilizan exclusivamente un EventSink en memoria. No hay
