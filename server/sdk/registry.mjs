@@ -9,8 +9,9 @@ export const DEFAULT_PLUGINS_DIRECTORY = fileURLToPath(new URL('../../plugins/',
 export class GameRegistry {
   #plugins = new Map();
 
-  async register(pluginDirectory) {
+  async register(pluginDirectory, { expected } = {}) {
     const plugin = await loadManifest(pluginDirectory);
+    if (expected && JSON.stringify(expected) !== JSON.stringify(plugin)) throw new ManifestError('PLUGIN_CHANGED', 'plugin', 'el paquete cambió antes de publicarse');
     const id = plugin.manifest.id;
     if (this.#plugins.has(id)) {
       throw new ManifestError('DUPLICATE_ID', 'id', 'ID ya registrado; se conserva el primer paquete válido');

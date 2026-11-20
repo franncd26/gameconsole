@@ -8,6 +8,7 @@ import { decide } from "./prolog.mjs";
 import { connectSDK, prepareSDKFromEnvironment } from "./sdk/bootstrap.mjs";
 import { createSDKHTTP } from "./sdk/http-api.mjs";
 import { createWebAssets } from "./sdk/web-assets.mjs";
+import { createImporterHTTP } from './sdk/importer/http.mjs';
 
 const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const types = {
@@ -27,6 +28,7 @@ export function createApp({
   const matches = new Map(),
     outbox = new EventOutbox(statsURL, { fetcher: statsFetcher });
   const sdkRuntime = connectSDK(sdk, outbox);
+  const handleImport = createImporterHTTP(sdkRuntime?.importer);
   const handleWeb = createWebAssets(sdkRuntime, { bridgeDirectory: path.join(publicDir, 'sdk/bridge'), publicOrigin });
   const handleSDK = createSDKHTTP(sdkRuntime, {
     ...sdkHTTP, outbox, statsURL, fetcher: statsFetcher,
@@ -83,6 +85,7 @@ export function createApp({
         return await handleWeb(req, res);
       const url = new URL(req.url, "http://localhost"),
         p = url.pathname;
+      if (p === '/api/sdk/plugins/import' || p.startsWith('/api/sdk/plugins/import/')) return await handleImport(req, res, url);
       if (p === "/api/sdk" || p.startsWith("/api/sdk/"))
         return await handleSDK(req, res, url);
       if (

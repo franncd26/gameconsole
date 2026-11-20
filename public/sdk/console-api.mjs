@@ -1,6 +1,15 @@
 import { validateSnapshot } from './bridge/protocol.mjs';
 
 const messages = {
+  INVALID_ARCHIVE: 'ZIP corrupto, archivos no permitidos o Python 3 no disponible.',
+  INVALID_PACKAGE: 'El paquete no cumple el contrato SDK; revisa manifiesto, archivos y sesión.',
+  INVALID_PROFILE: 'El perfil analítico no es compatible con el juego o no declara una métrica verificable.',
+  DUPLICATE_ID: 'Ya existe un juego o perfil con ese ID. Esta fase no permite reemplazarlo.',
+  ANALYTICS_ACTIVATION_FAILED: 'Scala no verificó el nuevo perfil. Se canceló la instalación.',
+  ANALYTICS_RECOVERY_PENDING: 'La instalación falló y el analizador aún no confirmó su recuperación.',
+  IMPORT_ORIGIN: 'Importación disponible solo desde el origen local de la consola.',
+  PREVIEW_EXPIRED: 'La vista previa expiró; selecciona de nuevo el ZIP.',
+  IMPORT_BUSY: 'Hay instalaciones o vistas previas pendientes. Espera y vuelve a intentarlo.',
   MULTIPLE_INSTANCES_DISABLED: 'Este plugin ya tiene una partida sin finalizar. Puedes abrirla o finalizarla.',
   SDK_DISABLED: 'SDK deshabilitado. Habilita el SDK y configura los plugins confiables en el servidor.',
   INSTANCE_LIMIT: 'Se alcanzó el límite de partidas del servidor.',
@@ -18,10 +27,10 @@ export class ConsoleError extends Error {
 }
 export class ConsoleAPI {
   constructor(fetcher = (...args) => globalThis.fetch(...args)) { this.fetcher = fetcher; }
-  async request(route, { body, signal, pending = false } = {}) {
+  async request(route, { body, signal, pending = false, raw } = {}) {
     let response, value;
     try {
-      response = await this.fetcher(route, { cache: 'no-store', signal, ...(body === undefined ? {} : {
+      response = await this.fetcher(route, { cache: 'no-store', signal, ...(raw ? { method: 'POST', headers: { 'Content-Type': 'application/zip' }, body: raw } : body === undefined ? {} : {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
       }) });
       value = await response.json();
@@ -39,6 +48,9 @@ export class ConsoleAPI {
     if (!Array.isArray(value) || value.some(p => typeof p.id !== 'string' || typeof p.name !== 'string' || !Array.isArray(p.options))) throw new ConsoleError(502, 'INVALID_RESPONSE');
     return value;
   }
+  importStatus() { return this.request('/api/sdk/plugins/import'); }
+  previewPlugin(file) { return this.request('/api/sdk/plugins/import/preview', { raw: file }); }
+  installPlugin(token) { return this.request('/api/sdk/plugins/import', { body: { token } }); }
   async matches() {
     const value = await this.request('/api/sdk/matches');
     if (!Array.isArray(value)) throw new ConsoleError(502, 'INVALID_RESPONSE');

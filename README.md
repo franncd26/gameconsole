@@ -1,5 +1,10 @@
 # GameConsole SDK v1
 
+Experimento optativo: [importador .game.zip](docs/sdk-v1/phase-3i2-plugin-importer.md).
+`node scripts/deploy-importer.mjs` prepara un entorno local separado (:3001) con
+perfiles persistentes y recarga del proceso Scala. No cambia el despliegue académico
+ni su catálogo de tres juegos. La construcción y la recarga real requieren validación manual.
+
 Proyecto 2 · Lenguajes de Programación, TEC · Francisco Castillo y Justin.
 Tres paquetes autónomos: Gato (SWI-Prolog), Snake y Circuito. La consola descubre
 plugins confiables, administra partidas e incrusta sus interfaces mediante Bridge v1.

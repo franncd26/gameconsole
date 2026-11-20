@@ -5,6 +5,7 @@ import { HostBridge } from './bridge/host-bridge.mjs';
 import { PresentationCoordinator, readPreferences, savePreferences } from './console-presentation.mjs';
 import { GridResultsCoordinator } from './console-grid-stats.mjs';
 import { navigationDirection } from './bridge/protocol.mjs';
+import { PluginImportView } from './console-import.mjs';
 
 export class ConsoleApp {
   constructor({ document, window, api = new ConsoleAPI(), bridge, clock = globalThis }) {
@@ -23,6 +24,7 @@ export class ConsoleApp {
     this.presentation = new PresentationCoordinator({ bridge: this.bridge, locks: window.navigator?.locks, channel,
       onError: message => { this.notice.textContent = message; }, onChange: (id, control) => this.workspace?.control(id, control) });
     const onError = error => this.error(error);
+    this.importView = new PluginImportView({ document, api, onInstalled: () => this.loadCatalog() });
     this.workspace = new MatchWorkspace({ document, root: document.getElementById('workspace'), bridge: this.bridge,
       historyRoot: document.getElementById('history-workspace'), empty: document.getElementById('workspace-empty'), clock,
       onSelect: id => void this.select(id), onFinish: id => void this.finish(id), onError,
@@ -109,6 +111,7 @@ export class ConsoleApp {
     this.notice.textContent = error instanceof ConsoleError ? error.message : 'Operación no completada. Consulta el estado y vuelve a intentarlo.';
   }
   async init() {
+    void this.importView.init();
     const requested = new URLSearchParams(this.window.location.search).get('match');
     if (requested) this.selectedId = requested;
     void this.dashboard.setKey('dashboard');
@@ -118,7 +121,8 @@ export class ConsoleApp {
     if (requested) await this.select(requested);
   }
   async loadCatalog() {
-    if (this.catalogBusy || this.disposed) return;
+    if (this.disposed) return;
+    if (this.catalogBusy) { this.catalogAgain = true; return; }
     this.catalogBusy = true;
     try {
       const catalog = await this.api.catalog(); if (this.disposed) return;
@@ -127,7 +131,7 @@ export class ConsoleApp {
       this.stats.renderDashboard(this.dashboard.state);
       this.notice.textContent = catalog.length ? 'Tu biblioteca está lista. Elige tu próximo juego.' : 'No hay juegos disponibles. Vuelve a actualizar la biblioteca.';
     } catch (error) { this.error(error); }
-    finally { this.catalogBusy = false; }
+    finally { this.catalogBusy = false; if (this.catalogAgain) { this.catalogAgain = false; void this.loadCatalog(); } }
   }
   accept(snapshot) {
     if (this.disposed) return;
@@ -235,6 +239,7 @@ export class ConsoleApp {
   }
   dispose() {
     if (this.disposed) return; this.disposed = true; this.selection++;
+    this.importView.dispose();
     for (const resource of [this.results, this.dashboard, this.sessions]) resource.dispose();
     this.gridResults.dispose();
     for (const unsubscribe of this.unsubscribers) unsubscribe(); for (const remove of this.listeners) remove();

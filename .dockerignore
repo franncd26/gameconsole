@@ -9,6 +9,9 @@
 !prolog/**
 !plugins/
 !plugins/**
+!deployment/
+!deployment/importer/
+!deployment/importer/**
 # Reapply exclusions inside allowed resource trees.
 **/.git
 **/.deps

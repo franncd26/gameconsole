@@ -1,4 +1,4 @@
-# GameConsole SDK v1 — Fases 0–3I.1
+# GameConsole SDK v1 — Fases 0–3I.2 experimental
 
 Esta carpeta define el contrato para una evolución incremental. **Están
 implementados manifiestos, registro y la infraestructura local de carga confiable,
@@ -46,6 +46,7 @@ e historial con liberación visual de canales. No cambia Manager, Bridge ni anal
 - [Fase 3G implementada](phase-3g-multiinstance-experience.md): multiinstancia, consola enfocada/cuadrícula e historial no destructivo.
 - [Fase 3H implementada](phase-3h-game-experience.md): preferencias de actividad local, reanudación, PRESENTATION y control cooperativo entre pestañas.
 - [Fase 3I.1 implementada](phase-3i1-multigame-ux.md): Pausa estable, resultados individuales en cuadrícula y navegación por teclado desde host/iframe.
+- [Fase 3I.2 experimental](phase-3i2-plugin-importer.md): instalación .game.zip, registro vivo, persistencia y supervisor Scala; Docker real pendiente.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada

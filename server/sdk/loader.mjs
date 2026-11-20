@@ -24,6 +24,13 @@ export class GamePluginLoader {
     if (!this.#modules.has(gameId)) this.#modules.set(gameId, this.#load(registered));
     return this.#modules.get(gameId);
   }
+  // Host-only publication of an executable already checked by an isolated SDK loader.
+  trustRegistered(gameId, executable) {
+    const registered = this.#registry.get(gameId);
+    requireSDK(registered && JSON.stringify(registered.manifest) === JSON.stringify(executable.manifest)
+      && !this.#trustedIds.has(gameId), 'INVALID_CONFIGURATION', 'Publicación de plugin incompatible.');
+    this.#trustedIds.add(gameId); this.#modules.set(gameId, Promise.resolve(executable));
+  }
 
   async #load(registered) {
     let current;
