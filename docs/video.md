@@ -13,7 +13,7 @@ La demostración debe realizarse con el deployment académico de **Gato, Snake y
 | **6:00–8:00** | Mantener varias partidas abiertas; mostrar instancias distintas del mismo juego, la cuadrícula y otra pestaña que comparte una partida por ID. |
 | **8:00–9:45** | Mostrar las estadísticas de cada partida mientras continúa y el dashboard general; explicar los conteos de instancias y la separación Go/Scala. |
 | **9:45–11:15** | Explicar la arquitectura orientada a objetos, el SDK, las responsabilidades de las clases y los patrones Factory, Adapter y Observer. |
-| **11:15–12:30** | Mostrar el deployment Docker y la [ejecución aprobada de CI/CD](https://github.com/JusMH/gameconsole/actions/runs/44814482222), incluyendo su integración real. |
+| **11:15–12:30** | Mostrar el deployment Docker y la [ejecución aprobada de CI/CD](https://github.com/franncd26/gameconsole/actions/runs/44819352482), incluyendo su integración real. |
 | **12:30–13:00** | Resumir las limitaciones y concluir. |
 
 ## Preparación de la grabación
