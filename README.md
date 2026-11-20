@@ -21,14 +21,16 @@ La configuración de entrega contiene **exactamente tres juegos**:
 - Docker Compose v2, compatible con `up --wait`.
 - Conexión a Internet durante la primera construcción, para obtener imágenes y dependencias.
 
-No es necesario instalar Go, Scala ni SWI-Prolog en el equipo anfitrión: se incluyen en los contenedores. El repositorio **GameStats** se prepara automáticamente en la revisión indicada en `gamestats.lock.json`. Para clonar los repositorios privados se requiere acceso autorizado a GitHub.
+Antes de comenzar, iniciar Docker Desktop o Docker Engine y comprobar que `node --version` y `docker compose version` funcionan. La versión principal de Node debe ser **22**.
+
+No es necesario instalar Go, Scala ni SWI-Prolog en el equipo anfitrión **para ejecutar la consola**: se incluyen en los contenedores. GameStats se prepara automáticamente desde su [repositorio público](https://github.com/JusMH/gamestats), utilizando la revisión indicada en `gamestats.lock.json`. Tanto GameConsole como GameStats son públicos y pueden clonarse sin credenciales de GitHub.
 
 ## Instalación y deployment
 
 Desde PowerShell o una terminal con Node y Docker disponibles:
 
 ```powershell
-git clone https://github.com/JusMH/gameconsole.git
+git clone https://github.com/franncd26/gameconsole.git
 cd gameconsole
 node scripts/deploy.mjs
 ```
@@ -57,6 +59,18 @@ node scripts/deploy.mjs --stop
 
 El deployment es reproducible mediante Docker Compose **en un entorno local**; no requiere un sitio web alojado públicamente. Se pueden ajustar los puertos expuestos con `PORT` y `GAMESTATS_PORT`.
 
+## Verificación rápida de la instalación
+
+Estas comprobaciones permiten evaluar el funcionamiento sin instalar Go, Scala ni Prolog en el equipo anfitrión:
+
+1. Ejecutar `docker compose -p gameconsole ps` y confirmar que los tres servicios (`gameconsole`, `go-ingestion`, `scala-analysis`) están saludables.
+2. Abrir **http://127.0.0.1:3000/** y comprobar que **Biblioteca** muestra exactamente **Gato, Snake y Circuito**.
+3. Iniciar **Gato** en dificultad alta, colocar una X y observar la respuesta de la computadora, calculada mediante Prolog.
+4. Iniciar partidas de **Snake** y **Circuito**, entrar en **Partidas → Cuadrícula** y comprobar que funcionan simultáneamente. Se pueden crear también varias instancias de un mismo videojuego.
+5. Consultar las estadísticas de una partida y abrir la sección **Estadísticas** para comprobar los resultados generales y por videojuego. Los valores se actualizan periódicamente mientras se generan eventos.
+
+Para una validación automatizada con los servicios reales, consultar la sección de pruebas. Ejecutarla **sin otras partidas abiertas ni productores de eventos simultáneos**, porque crea y finaliza partidas de prueba.
+
 ## Uso de la consola
 
 1. Seleccionar un videojuego en **Biblioteca**, configurar sus opciones y crear una partida.
@@ -71,7 +85,11 @@ En Snake y Circuito, **Jugar / Pausa / Continuar** controla la actividad del cli
 
 ## Pruebas y CI/CD
 
-Para las pruebas locales se necesita Node.js 22 y SWI-Prolog disponible en el equipo. Python 3 solo es necesario para las pruebas del importador opcional.
+Las pruebas automatizadas son **opcionales para utilizar la consola**. Para evaluar los tres juegos en el navegador es suficiente con seguir el deployment y la verificación rápida.
+
+- `npm run check` requiere Node.js 22 y comprueba la sintaxis.
+- `npm test` requiere Node.js 22, **SWI-Prolog** en `PATH` (o `SWIPL_PATH`) y **Python 3** para las pruebas de paquetes ZIP del importador. Estas son dependencias de las pruebas locales, no de los videojuegos ejecutados en Docker.
+- `npm run test:integration:sdk` comprueba el sistema real con los tres servicios Docker **ya iniciados y saludables**. Prolog se ejecuta dentro de su contenedor; no requiere instalarlo en el equipo anfitrión.
 
 ```powershell
 npm run check
@@ -86,7 +104,35 @@ npm run test:integration:sdk
 
 El comando de integración verifica la creación de partidas, decisiones de Prolog, entrega de eventos a Go, resultados provisionales y finales de Scala y conteos del panel general. Genera `evidence/sdk-integration.json`.
 
-El pipeline de GitHub Actions ejecuta las pruebas, construye Docker y realiza una integración con los servicios reales. La [ejecución de verificación](https://github.com/JusMH/gameconsole/actions/runs/44814482222) finalizó correctamente; sus trabajos `verify` e `integrated` están aprobados.
+El pipeline de GitHub Actions ejecuta las pruebas, construye Docker y realiza una integración con los servicios reales. La [ejecución de verificación del repositorio original](https://github.com/franncd26/gameconsole/actions/runs/44819352482) finalizó correctamente; sus trabajos `verify` e `integrated` están aprobados.
+
+## Solución de problemas habituales
+
+| Situación | Qué comprobar |
+| --- | --- |
+| `docker` no se reconoce o no conecta con el servicio. | Iniciar Docker Desktop o Docker Engine y ejecutar `docker info` y `docker compose version`. En Windows, utilizar contenedores Linux. |
+| Error de puerto en uso durante el despliegue. | Cerrar el servicio que utiliza ese puerto o cambiar los puertos publicados antes del arranque. |
+| No se puede preparar GameStats. | Comprobar Internet y el acceso al [repositorio público de GameStats](https://github.com/JusMH/gamestats). El script descarga automáticamente la revisión requerida. |
+| No aparecen estadísticas inmediatamente. | Generar eventos jugando, esperar la consulta periódica y confirmar que los tres servicios continúan saludables. |
+| Alguna prueba local indica que falta Prolog o Python. | Instalar las dependencias de pruebas indicadas arriba, o utilizar la demostración Docker y la evidencia de GitHub Actions. |
+
+En **PowerShell**, para cambiar los puertos publicados antes de iniciar:
+
+```powershell
+$env:PORT="3002"
+$env:GAMESTATS_PORT="8082"
+node scripts/deploy.mjs
+```
+
+En este ejemplo, GameConsole se abre en `http://127.0.0.1:3002/`. Estos cambios no alteran la comunicación interna de los contenedores.
+
+Para inspeccionar los últimos mensajes de los servicios:
+
+```powershell
+docker compose -p gameconsole logs --tail=100
+```
+
+Para detener el entorno, ejecutar `node scripts/deploy.mjs --stop`.
 
 ## Diseño y limitaciones
 

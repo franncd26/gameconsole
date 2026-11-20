@@ -18,19 +18,19 @@ La entrega incluye el código fuente de GameConsole, los tres juegos (Gato, Snak
 
 ## Resultados de CI/CD
 
-La [ejecución de GitHub Actions del 20 de noviembre de 2026](https://github.com/JusMH/gameconsole/actions/runs/44814482222) finalizó correctamente.
+La [ejecución de GitHub Actions del 20 de noviembre de 2026](https://github.com/franncd26/gameconsole/actions/runs/44819352482) finalizó correctamente.
 
 - **Verificación:** 342 pruebas Node aprobadas, sin fallos ni cancelaciones, junto con las pruebas de Prolog.
 - **Integración:** construcción y arranque de los tres servicios Docker, comprobación de los tres juegos, decisión real en Prolog y consulta de resultados Go/Scala.
 - **Resultado del ejecutor integrado:** `status: passed`.
-- **Evidencia:** [artefacto sdk-integration](https://github.com/JusMH/gameconsole/actions/runs/44814482222/artifacts/14669531219).
+- **Evidencia:** [artefacto sdk-integration](https://github.com/franncd26/gameconsole/actions/runs/44819352482/artifacts/14672010286).
 
 Estas pruebas automatizadas no sustituyen la demostración visual de los juegos y su interfaz.
 
 ## Reproducción del sistema
 
 ```powershell
-git clone https://github.com/JusMH/gameconsole.git
+git clone https://github.com/franncd26/gameconsole.git
 cd gameconsole
 node scripts/deploy.mjs
 ```
@@ -41,7 +41,9 @@ Abrir `http://127.0.0.1:3000/`. El catálogo académico presenta exactamente tre
 node scripts/deploy.mjs --stop
 ```
 
-Las instrucciones de uso, requisitos y pruebas locales están en el [README](../README.md); la justificación técnica se encuentra en [arquitectura](arquitectura.md) e [integración](integracion.md).
+Ambos repositorios, GameConsole y GameStats, son públicos. Para ejecutar el entorno Docker no es necesario instalar Go, Scala ni Prolog en el equipo anfitrión.
+
+Las instrucciones de uso, verificación rápida, solución de problemas y pruebas locales están en el [README](../README.md); la justificación técnica se encuentra en [arquitectura](arquitectura.md) e [integración](integracion.md).
 
 ## Demostración en video
 
