@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#11121a"><title>GameConsole · Juega y descubre</title>
+  <link rel="stylesheet" href="/sdk/console.css"><script type="module" src="/sdk/console.mjs"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/">gc<span>game<strong>console</strong><small>PLAY. THINK. REPEAT.</small></span></a>
+    <nav aria-label="Secciones"><a href="#library">Biblioteca</a><a href="#play">Partidas</a><a href="#analytics">Estadísticas generales</a></nav>
+    <span class="course">Lenguajes de Programación · SDK v1</span>
+  </header>
+  <main>
+    <section id="library" class="library"><div class="section-heading"><div><p class="eyebrow">TU PRÓXIMA PARTIDA</p><h1>Una consola. Nuevos desafíos.</h1><p class="muted">Elige un plugin, configura tu partida y juega con sus reglas oficiales.</p></div><button id="reload-catalog">Actualizar biblioteca</button></div>
+      <p id="notice" role="status" aria-live="polite">Conectando con el catálogo SDK…</p><div id="catalog" class="catalog"></div>
+    </section>
+    <section id="play"><div class="section-heading"><div><p class="eyebrow">ESPACIO DE JUEGO</p><h2>Tus partidas</h2></div><button id="reload-matches">Actualizar partidas</button></div>
+      <p id="sessions-status" class="muted">Consultando partidas…</p>
+      <div class="play-layout"><aside class="session-sidebar" aria-label="Partidas del servidor"><h3>En esta consola</h3><p class="muted">Seleccionar una partida conserva las otras vistas. Abrir otra pestaña comparte la misma partida.</p><ul id="match-list"></ul></aside>
+        <div id="workspace" class="workspace" aria-label="Ventanas de juego"></div>
+        <aside class="stats-sidebar" aria-label="Estadísticas de la partida seleccionada"><p class="eyebrow">GAMESTATS · PARTIDA</p><h2>Resultados en vivo</h2><p id="selected-title" class="identity">Selecciona una partida</p><button id="reload-stats">Actualizar estadísticas</button><p id="result-status" role="status">Sin consulta</p><div id="results"></div></aside>
+      </div>
+    </section>
+    <section id="analytics"><p class="eyebrow">GO → SCALA</p><h2>Estadísticas generales</h2><p class="muted">Eventos recibidos y analizados por GameStats durante su proceso actual. No son conteos calculados desde las partidas SDK.</p><p id="dashboard-status" role="status">Consultando…</p><div id="dashboard" class="dashboard"></div></section>
+  </main>
+  <footer>GameConsole · Proyecto de Lenguajes de Programación · Las partidas y el historial viven en la memoria del servidor.</footer>
+</body></html>

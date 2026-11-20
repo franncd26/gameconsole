@@ -1,4 +1,4 @@
-# GameConsole SDK v1 — Fases 0–3E.2
+# GameConsole SDK v1 — Fases 0–3E.3
 
 Esta carpeta define el contrato para una evolución incremental. **Están
 implementados manifiestos, registro y la infraestructura local de carga confiable,
@@ -18,8 +18,10 @@ sandbox y Bridge v1 con harness independiente y páginas de estado. Se comprobó
 el handshake de los tres plugins en navegador real con Go simulado.
 La [Fase 3E.2](phase-3e2-playable-web-games.md) añade las interfaces jugables
 independientes de Gato, Snake y Circuito, con acciones exclusivamente por Bridge.
-El catálogo y la interfaz históricos se conservan. No hay autenticación ni
-dashboard nuevo. Los fixtures no son un cuarto juego.
+La [Fase 3E.3](phase-3e3-console-stats.md) compone la consola visual SDK, biblioteca
+genérica, partidas concurrentes y consultas en vivo a GameStats. Con SDK habilitado
+es la página principal; deshabilitado conserva el frontend histórico. No hay
+autenticación nueva. Los fixtures no son un cuarto juego.
 
 - [Manifiesto normativo v1](manifest.md): campos, límites y reglas de archivos.
 - [Contrato diseñado de runtime y patrones](runtime-design.md): trabajo futuro.
@@ -33,6 +35,7 @@ dashboard nuevo. Los fixtures no son un cuarto juego.
 - [Fase 3D.2 implementada](phase-3d2-snake-racing.md): paquetes Snake/Circuito y concurrencia de los tres juegos.
 - [Fase 3E.1 implementada](phase-3e1-web-bridge.md): assets confiables, CSP/sandbox, Bridge v1 y demo de conexión.
 - [Fase 3E.2 implementada](phase-3e2-playable-web-games.md): interfaces, controles, cadencia, recuperación y verificación ligera.
+- [Fase 3E.3 implementada](phase-3e3-console-stats.md): consola principal SDK, opciones dinámicas, pestañas y estadísticas Go/Scala.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada

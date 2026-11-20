@@ -28,6 +28,16 @@ async function connected(t, options = {}) {
   await settle();
   return { ...pair, hostWindow: pair.host, host, client, state, status };
 }
+
+test('host refresh publishes an administrative finish to the same channel/frame without reload or duplicate INIT', async (t) => {
+  const h = await connected(t); const token = h.inbound[0].data.channelId;
+  h.state.snapshot = { ...snapshot('alpha', 'match-a', 1), state: 'finished' };
+  assert.equal(await h.host.refresh(h.frame), true); await settle();
+  assert.equal(h.client.getSnapshot().state, 'finished'); assert.equal(h.client.getSnapshot().version, 1);
+  assert.equal(h.inbound.filter(m => m.data.type === 'INIT').length, 1); assert.equal(h.inbound.at(-1).data.channelId, token);
+  const other = windows(h.hostWindow); await assert.rejects(h.host.refresh(other.frame), { code: 'BRIDGE_NOT_READY' });
+  h.host.unmount(h.frame); await assert.rejects(h.host.refresh(h.frame), { code: 'BRIDGE_NOT_READY' });
+});
 test('READY/INIT bind after initial load; pre-load READY is discarded and duplicate READY never reissues INIT', async (t) => {
   const h = await connected(t, { loaded: false });
   assert.equal(h.client.getIdentity(), null); h.frame.emit('load'); await settle();

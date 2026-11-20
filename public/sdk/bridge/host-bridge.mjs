@@ -67,6 +67,16 @@ export class HostBridge {
     this.#invalidate(r, reason); this.#records.delete(frame); frame.removeEventListener('load', r.load); this.#notify(r, 'detached');
   }
   unmount(frame) { this.detach(frame); frame.remove(); }
+  /** Host-only refresh after an administrative change; no reload or new channel. */
+  async refresh(frame) {
+    const r = this.#records.get(frame);
+    if (!r?.channel || !this.#active(r, r.generation)) throw new BridgeError('BRIDGE_NOT_READY');
+    if (r.reading) return false;
+    const generation = r.generation;
+    r.reading = true;
+    try { return await this.#refresh(r, randomId(this.#crypto), generation); }
+    finally { if (this.#active(r, generation)) r.reading = false; }
+  }
   dispose() {
     for (const frame of this.#records.keys()) this.detach(frame);
     this.#observer?.disconnect(); this.#window.removeEventListener('message', this.#listener);
@@ -83,8 +93,8 @@ export class HostBridge {
     try {
       const s = await this.#read(r);
       if (!this.#active(r, generation)) return;
-      this.#adopt(r, s); r.needsSync = false; this.#send(r, 'SNAPSHOT', id, r.snapshot);
-    } catch { if (this.#active(r, generation)) { r.needsSync = true; this.#error(r, id, 'SNAPSHOT_UNAVAILABLE'); } }
+      this.#adopt(r, s); r.needsSync = false; return this.#send(r, 'SNAPSHOT', id, r.snapshot);
+    } catch { if (this.#active(r, generation)) { r.needsSync = true; this.#error(r, id, 'SNAPSHOT_UNAVAILABLE'); } return false; }
   }
   async #ready(r, m) {
     // No READY replay/resend and no cross-load mailbox. A live channel never reissues INIT.

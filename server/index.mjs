@@ -157,7 +157,7 @@ export function createApp({
       if (req.method !== "GET" && req.method !== "HEAD")
         throw new GameError("Método no permitido.", 405);
       const relative =
-        p === "/" ? "index.html" : decodeURIComponent(p).replace(/^\//, "");
+        p === "/" ? (sdkRuntime ? "sdk/console.html" : "index.html") : decodeURIComponent(p).replace(/^\//, "");
       const target = path.resolve(publicDir, relative);
       if (!target.startsWith(publicDir))
         throw new GameError("Archivo no disponible.", 404);
