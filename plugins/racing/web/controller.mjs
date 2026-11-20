@@ -4,6 +4,8 @@ export class RacingController {
     Object.assign(this, { bridge, view, window, document, clock, id });
     this.snapshot = null; this.identity = null; this.connected = false;
     this.busy = false; this.disposed = false; this.uncertain = null; this.needsSync = true;
+    this.syncing = false;
+    this.syncFailed = false;
     this.active = !document.hidden; this.armed = false; this.timer = null;
     this.started = false; this.manuallyPaused = false; this.resumePending = false; this.presentationRevision = 0;
     this.presentation = { visible: !document.hidden, canControl: true, autoPause: true, autoResume: true };
@@ -49,13 +51,14 @@ export class RacingController {
   render() {
     if (!this.disposed) this.view.render({
       snapshot: this.snapshot ? structuredClone(this.snapshot) : null,
-      connected: this.connected, busy: this.busy, uncertain: Boolean(this.uncertain), needsSync: this.needsSync,
+      connected: this.connected, busy: this.busy, syncing: this.syncing, syncFailed: this.syncFailed, uncertain: Boolean(this.uncertain), needsSync: this.needsSync,
       note: this.note, armed: this.armed, active: this.active, presentationState: this.presentationState, canControl: this.presentation.canControl,
       accelerate: this.accelerate, brake: this.brake,
     });
   }
   report(error) {
     if (this.disposed) return;
+    this.syncFailed = true;
     this.armed = false; this.needsSync = true; this.clearTimer();
     const code = typeof error?.code === 'string' && /^[A-Z_]{1,64}$/.test(error.code) ? error.code : 'BRIDGE_ERROR';
     this.note = code === 'RESULT_UNKNOWN' || error?.unknown
@@ -66,11 +69,11 @@ export class RacingController {
   }
   async sync() {
     if (this.disposed || !this.connected || this.busy) return;
-    this.busy = true; this.clearTimer(); this.render();
-    try { this.adopt(await this.bridge.requestSnapshot()); this.adopt(this.bridge.getSnapshot()); this.needsSync = false; return true; }
+    this.busy = true; this.syncing = true; this.clearTimer(); this.render();
+    try { this.adopt(await this.bridge.requestSnapshot()); this.adopt(this.bridge.getSnapshot()); this.needsSync = false; this.syncFailed = false; return true; }
     catch (error) { this.report(error); return false; }
     finally {
-      this.busy = false; this.render();
+      this.busy = false; this.syncing = false; this.render();
       if (this.resumePending && !this.disposed && !this.uncertain) {
         this.resumePending = false; queueMicrotask(() => { void this.resume(); });
       } else this.schedule();
@@ -79,14 +82,14 @@ export class RacingController {
   async act(type, payload, replay = null) {
     if (this.disposed || this.busy || !this.connected || !this.active || !this.presentation.canControl || this.snapshot?.state !== 'running' || ((this.uncertain || this.needsSync) && !replay)) return;
     const operation = replay || { type, payload: structuredClone(payload), messageId: this.id() };
-    this.busy = true; this.needsSync = true; this.clearTimer(); this.note = 'Procesando…'; this.render();
+    this.busy = true; this.needsSync = true; this.clearTimer(); this.note = this.armed ? 'Jugando' : 'Procesando…'; this.render();
     let known = false;
     try {
       const result = await this.bridge.dispatch(operation.type, operation.payload, { messageId: operation.messageId });
       known = true; this.uncertain = null;
       if (this.disposed) return result;
       // ACTION_RESULT can be a replay of an older version. Never render its snapshot.
-      this.note = result.outcome === 'completed' ? 'Acción confirmada'
+      this.note = result.outcome === 'completed' ? (this.armed ? 'Jugando' : 'Acción confirmada')
         : result.outcome === 'dependency_failed' ? (result.committed ? 'Cambio confirmado; falló una dependencia. Consulta el estado para continuar.' : 'La dependencia falló; no hubo nuevos cambios.')
         : 'Acción rechazada (' + (result.error?.code || 'REJECTED') + ').';
       if (result.outcome !== 'completed') { this.armed = false; this.clearTimer(); }
@@ -107,6 +110,7 @@ export class RacingController {
     if (!this.presentation.canControl) return 'spectator';
     if (this.manuallyPaused) return 'manuallyPaused';
     if (!this.active) return 'autoSuspended';
+    if (this.armed && !this.syncing) return 'playing';
     if (this.busy || this.needsSync && this.started) return 'resyncing';
     return this.armed ? 'playing' : 'ready';
   }

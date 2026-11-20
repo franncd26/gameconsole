@@ -16,6 +16,7 @@ export class Node extends Target {
   set textContent(value) { this.replaceChildren(); this._text = String(value); }
   get textContent() { return this._text + this.children.map(n => n.textContent).join(' '); }
   setAttribute(name, value) { this.attributes[name] = String(value); }
+  focus() { this.focusCount = (this.focusCount || 0) + 1; this.fire('focus'); }
   checkValidity() {
     if (this.type === 'checkbox') return true;
     if (this.required && !this.value.length) return false;

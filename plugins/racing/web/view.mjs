@@ -1,4 +1,5 @@
 export class RacingView {
+  set(node, key, value) { if (node[key] !== value) node[key] = value; }
 
   constructor(document) {
     this.document=document; this.listeners=[]; this.previousCollisions=0; this.retryAI=document.getElementById('retry-ai');
@@ -9,14 +10,15 @@ export class RacingView {
   commonBind(actions){this.listen(this.sync,'click',actions.sync);this.listen(this.replay,'click',actions.replay);if(this.start)this.listen(this.start,'click',actions.start);}
   commonRender(model){
     const labels={ready:'Preparado',playing:'Jugando',manuallyPaused:'Pausado',autoSuspended:'En segundo plano',spectator:'Observador',resyncing:'Sincronizando',uncertain:'Resultado sin confirmar',finished:'Finalizado'};
-    this.connection.textContent=model.connected?(labels[model.presentationState]||'Conectado'):'Sin conexión';
-    this.note.textContent=model.note;this.sync.disabled=!model.connected||model.busy;
-    this.replay.hidden=!model.uncertain;this.replay.disabled=model.busy||!model.connected||!model.canControl||model.snapshot?.state!=='running';
+    this.set(this.connection,'textContent',model.connected?(labels[model.presentationState]||'Conectado'):'Sin conexión');
+    this.set(this.note,'textContent',model.note);this.set(this.sync,'disabled',!model.connected||model.busy);
+    this.set(this.replay,'hidden',!model.uncertain);this.set(this.replay,'disabled',model.busy||!model.connected||!model.canControl||model.snapshot?.state!=='running');
     if(this.start){
-      this.start.disabled=!model.connected||model.busy||model.uncertain||!model.active||model.snapshot?.state!=='running';
-      this.start.textContent=model.busy?'Esperando sincronización':model.armed?'Pausa':model.presentationState==='ready'?'Jugar':'Continuar';
+      this.set(this.start,'disabled',!model.connected||(model.busy&&model.presentationState!=='playing')||model.uncertain||!model.active||model.snapshot?.state!=='running');
+      const label={playing:'Pausa',ready:'Jugar',manuallyPaused:'Continuar',autoSuspended:'Suspendido',spectator:'Observador',finished:'Finalizado',uncertain:'Revisar resultado'};
+      this.set(this.start,'textContent',label[model.presentationState]||(model.syncing?'Esperando sincronización':model.syncFailed?'Recuperar conexión':'Continuar'));
     }
-    const s=model.snapshot;this.identity.textContent=s?s.gameId+' · '+s.matchId+' · '+s.state+' · v'+s.version:'Esperando INIT';
+    const s=model.snapshot;this.set(this.identity,'textContent',s?s.gameId+' · '+s.matchId+' · '+s.state+' · v'+s.version:'Esperando INIT');
   }
   dispose(){for(const remove of this.listeners)remove();this.listeners=[];}
 
@@ -34,16 +36,19 @@ export class RacingView {
   }
   render(model){
     this.commonRender(model);const s=model.snapshot,data=s?.data;
-    this.document.getElementById('speed').textContent=String(Math.round(data?.speed??0));
-    this.document.getElementById('laps').textContent=(data?.lap??0)+' / '+(data?.totalLaps??3);
-    this.document.getElementById('collisions').textContent=String(data?.collisions??0);
-    this.document.getElementById('times').textContent=data?.lapTimes.length?data.lapTimes.map((t,i)=>(i+1)+': '+(t/1000).toFixed(2)+' s').join(' · '):'Sin vueltas completadas';
-    this.result.textContent=data?.result==='race_completed'?'¡Carrera completada!':s&&s.state!=='running'?'Partida cerrada':'';
+    this.set(this.document.getElementById('speed'),'textContent',String(Math.round(data?.speed??0)));
+    this.set(this.document.getElementById('laps'),'textContent',(data?.lap??0)+' / '+(data?.totalLaps??3));
+    this.set(this.document.getElementById('collisions'),'textContent',String(data?.collisions??0));
+    this.set(this.document.getElementById('times'),'textContent',data?.lapTimes.length?data.lapTimes.map((t,i)=>(i+1)+': '+(t/1000).toFixed(2)+' s').join(' · '):'Sin vueltas completadas');
+    this.set(this.result,'textContent',data?.result==='race_completed'?'¡Carrera completada!':s&&s.state!=='running'?'Partida cerrada':'');
     if(data&&data.collisions>this.previousCollisions)this.collisionVersion=s.version;
     this.document.getElementById('track').classList.toggle('flash',Boolean(data&&s.version===this.collisionVersion));this.previousCollisions=data?.collisions??0;
     for(const b of this.document.querySelectorAll('[data-lane], [data-pedal]')){
-      b.disabled=!model.connected||!model.active||model.uncertain||s?.state!=='running';
-      if(b.dataset.pedal){b.classList.toggle('held',model[b.dataset.pedal]);b.setAttribute('aria-pressed',String(model[b.dataset.pedal]));}
+      this.set(b,'disabled',!model.connected||!model.active||model.uncertain||s?.state!=='running');
+      if(b.dataset.pedal){
+        b.classList.toggle('held',model[b.dataset.pedal]);
+        if(b.pressed!==model[b.dataset.pedal]){b.pressed=model[b.dataset.pedal];b.setAttribute('aria-pressed',String(b.pressed));}
+      }
     }
     const c=this.context;if(!c)return;const w=this.canvas.width,h=this.canvas.height,lw=w/3;
     c.fillStyle='#171e30';c.fillRect(0,0,w,h);c.strokeStyle='#69758c';c.lineWidth=2;c.setLineDash([12,12]);

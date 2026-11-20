@@ -70,6 +70,13 @@ export function validatePresentation(input) {
     || Object.values(p).some(v => typeof v !== 'boolean')) throw new BridgeError('INVALID_MESSAGE');
   return p;
 }
+export function navigationDirection(event) {
+  if (!event.ctrlKey || !event.altKey || event.metaKey || event.shiftKey || event.repeat || event.defaultPrevented) return null;
+  const target = event.target;
+  if (target?.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target?.tagName?.toUpperCase())
+    || target?.closest?.('input,textarea,select,[contenteditable]:not([contenteditable="false"])')) return null;
+  return ({ j: 'previous', k: 'next' })[event.key?.toLowerCase()] || null;
+}
 export function validateMessage(input, direction) {
   const m = copyJSON(input);
   if (!object(m)) throw new BridgeError('INVALID_MESSAGE');
@@ -77,9 +84,11 @@ export function validateMessage(input, direction) {
     ['protocol', 'version', 'type', 'messageId', 'payload', ...(m.type === 'READY' ? [] : ['channelId'])])
     || m.protocol !== PROTOCOL || m.version !== VERSION || !messageId(m.messageId)
     || (m.type !== 'READY' && (typeof m.channelId !== 'string' || !/^[a-f0-9]{32}$/.test(m.channelId)))) throw new BridgeError('INVALID_MESSAGE');
-  const inbound = ['READY', 'ACTION_REQUEST', 'SNAPSHOT_REQUEST'], outbound = ['INIT', 'ACTION_RESULT', 'SNAPSHOT', 'ERROR', 'DETACH', 'PRESENTATION'];
+  const inbound = ['READY', 'ACTION_REQUEST', 'SNAPSHOT_REQUEST', 'NAVIGATION_REQUEST'], outbound = ['INIT', 'ACTION_RESULT', 'SNAPSHOT', 'ERROR', 'DETACH', 'PRESENTATION'];
   if (!(direction === 'game' ? inbound : direction === 'host' ? outbound : [...inbound, ...outbound]).includes(m.type)) throw new BridgeError('INVALID_MESSAGE');
   switch (m.type) {
+    case 'NAVIGATION_REQUEST':
+      if (!exact(m.payload, ['direction']) || !['previous', 'next'].includes(m.payload.direction)) throw new BridgeError('INVALID_MESSAGE'); break;
     case 'PRESENTATION': validatePresentation(m.payload); break;
     case 'READY': case 'SNAPSHOT_REQUEST': if (!exact(m.payload, [])) throw new BridgeError('INVALID_MESSAGE'); break;
     case 'ACTION_REQUEST': if (!exact(m.payload, ['action'])) throw new BridgeError('INVALID_MESSAGE'); validateAction(m.payload.action); break;

@@ -145,10 +145,20 @@ export class MatchWorkspace {
       tools.append(record.claim);
       diagnostics.append(detach, record.remount);
       card.append(title, badge, tools, banner, container, diagnostics, record.control); this.root.append(card); this.records.set(snapshot.matchId, record);
+      record.keyboard = element(d, 'p', 'keyboard-indicator'); record.keyboard.setAttribute('role', 'status');
+      record.summary = element(d, 'section', 'grid-summary'); record.summary.hidden = this.mode !== 'grid';
+      const resultStatus = element(d, 'p'), results = element(d, 'div');
+      record.summary.append(element(d, 'h4', '', 'Estadísticas de esta partida'), resultStatus, results);
+      record.analytics = new StatsPanel({ document: d, results, resultStatus });
+      card.append(record.keyboard, record.summary);
     }
     this.upsert(snapshot, name);
     if (!record.frame && record.snapshot.state !== 'finished') {
-      try { record.frame = this.bridge.mount(record.container, record.snapshot); record.needsRefresh = false; }
+      try {
+        record.frame = this.bridge.mount(record.container, record.snapshot); record.needsRefresh = false;
+        const mounted = record.frame;
+        mounted.addEventListener('focus', () => { if (record.frame === mounted && !record.retired && !record.card.hidden) this.markKeyboard(snapshot.matchId); });
+      }
       catch { record.channel.textContent = 'No se pudo montar. Revisa el límite de 32 canales del Bridge y desmonta una vista.'; }
     }
     this.select(snapshot.matchId); return record;
@@ -158,11 +168,31 @@ export class MatchWorkspace {
     this.mode = mode; this.root.classList.toggle('grid', mode === 'grid'); this.visibility();
   }
   select(id) { this.selectedId = id; this.visibility(); }
+  markKeyboard(id) {
+    this.keyboardId = id;
+    for (const [key, r] of this.records) {
+      r.card.classList.toggle('keyboard-target', key === id);
+      if (r.keyboard) r.keyboard.textContent = key === id ? 'Teclado aquí · Ctrl + Alt + J / K para cambiar' : '';
+    }
+  }
+  focus(id) {
+    const r = this.records.get(id);
+    if (!r?.frame || r.card.hidden || r.snapshot.state !== 'running') return false;
+    this.select(id); this.markKeyboard(id);
+    r.frame.focus?.(); r.frame.contentWindow?.focus?.(); return true;
+  }
+  renderSummary(id, frame, state) {
+    const r = this.records.get(id);
+    if (!r || r.frame !== frame || r.retired) return;
+    if (state.data && (state.data.matchId !== id || state.data.gameId !== r.snapshot.gameId)) return;
+    r.analytics.renderResults(state);
+  }
   visibility() {
     let visible = false;
     for (const [id, record] of this.records) {
       record.card.classList.toggle('selected', id === this.selectedId);
       record.card.hidden = record.retired ? id !== this.selectedId : this.mode === 'focus' && id !== this.selectedId;
+      record.summary.hidden = this.mode !== 'grid' || record.retired;
       if (!record.retired && !record.card.hidden) visible = true;
     }
     if (this.empty) this.empty.hidden = visible;
@@ -206,6 +236,7 @@ export class MatchWorkspace {
     if (r.terminalTimer !== null) this.clock.clearTimeout(r.terminalTimer);
     r.terminalTimer = null;
     const frame = r.frame;
+    if (this.keyboardId === id) this.markKeyboard(null);
     r.frame = null; r.generation++; r.refreshing = false; r.needsRefresh = false;
     if (frame) { this.bridge.unmount(frame); r.channel.textContent = 'Vista desmontada; la partida permanece en el servidor.'; }
     this.onChange();
@@ -244,13 +275,15 @@ export class StatsPanel {
     }
   }
   renderResults(state) {
+    const expanded = this.more?.open || false;
     this.status(this.resultStatus, state); this.results.replaceChildren();
     if (!state.data) return;
     const value = state.data;
     this.results.append(element(this.document, 'p', 'identity', value.gameId + ' · ' + value.matchId + ' · ' + value.state));
     if (state.status !== 'updated') this.results.append(element(this.document, 'p', 'warning', 'Datos de la última consulta; pueden estar desactualizados.'));
     this.results.append(element(this.document, 'h3', '', 'Resumen de la partida')); this.rows(this.results, value.metrics.slice(0, 3));
-    const all = element(this.document, 'details', 'diagnostics'); all.append(element(this.document, 'summary', '', 'Más métricas y patrones'));
+    const all = element(this.document, 'details', 'diagnostics'); all.open = expanded; this.more = all;
+    all.append(element(this.document, 'summary', '', 'Más métricas y patrones'));
     this.rows(all, value.metrics.slice(3)); this.rows(all, value.patterns, true); this.results.append(all);
     if (!value.metrics.length && !value.patterns.length) this.results.append(element(this.document, 'p', 'muted', 'Sin resultados analíticos disponibles en este perfil.'));
   }

@@ -3,6 +3,8 @@ import { PollResource } from './console-stats.mjs';
 import { CatalogView, MatchWorkspace, StatsPanel, element, shortId } from './console-views.mjs';
 import { HostBridge } from './bridge/host-bridge.mjs';
 import { PresentationCoordinator, readPreferences, savePreferences } from './console-presentation.mjs';
+import { GridResultsCoordinator } from './console-grid-stats.mjs';
+import { navigationDirection } from './bridge/protocol.mjs';
 
 export class ConsoleApp {
   constructor({ document, window, api = new ConsoleAPI(), bridge, clock = globalThis }) {
@@ -12,7 +14,8 @@ export class ConsoleApp {
     this.selection = 0; this.disposed = false;
     this.notice = document.getElementById('notice'); this.list = document.getElementById('match-list');
     this.historyList = document.getElementById('history-list');
-    this.bridge = bridge || new HostBridge({ window, onStatus: event => this.workspace?.status(event) });
+    this.bridge = bridge || new HostBridge({ window, onStatus: event => this.workspace?.status(event),
+      onNavigate: event => this.navigate(event.direction, event.matchId) });
     try { this.storage = window.localStorage; } catch { /* Optional host-only preferences. */ }
     this.preferences = readPreferences(this.storage);
     let channel;
@@ -28,11 +31,12 @@ export class ConsoleApp {
       onCreate: (id, options) => this.create(id, options), onOpen: id => this.select(id), onFinish: id => this.finish(id) });
     this.stats = new StatsPanel({ document, results: document.getElementById('results'), dashboard: document.getElementById('dashboard'),
       resultStatus: document.getElementById('result-status'), dashboardStatus: document.getElementById('dashboard-status') });
+    this.gridResults = new GridResultsCoordinator({ api, clock, onUpdate: (id, frame, state) => this.workspace.renderSummary(id, frame, state) });
     const common = { clock, hidden: () => document.hidden };
-    this.results = new PollResource({ ...common, interval: 3000, task: (id, signal) => api.results(id, signal) });
+    this.results = new PollResource({ ...common, interval: 3000, task: id => this.gridResults.fetch(id, this.snapshots.get(id)?.gameId) });
     this.dashboard = new PollResource({ ...common, interval: 5000, task: (_key, signal) => api.dashboard(signal) });
     this.sessions = new PollResource({ ...common, interval: 5000, task: async () => ({ status: 200, data: await api.matches() }) });
-    this.unsubscribers = [this.results.subscribe(s => this.stats.renderResults(s)), this.dashboard.subscribe(s => this.stats.renderDashboard(s)),
+    this.unsubscribers = [this.results.subscribe(s => { this.stats.renderResults(s); this.gridResults.selected(s); }), this.dashboard.subscribe(s => this.stats.renderDashboard(s)),
       this.sessions.subscribe(s => {
         if (s.status === 'updated') this.reconcile(s.data);
         document.getElementById('sessions-status').textContent = s.status === 'failed' ? 'No pudimos actualizar tus partidas. Vuelve a intentarlo.' : s.lastSuccess ? 'Lista actualizada · ' + s.lastSuccess : 'Buscando tus partidas…';
@@ -43,6 +47,10 @@ export class ConsoleApp {
     this.listen(document.getElementById('reload-matches'), 'click', () => void this.sessions.refresh());
     this.listen(document, 'visibilitychange', () => { for (const resource of [this.results, this.dashboard, this.sessions]) resource.visibilityChanged(); this.updatePresentation(); });
     this.listen(window, 'pagehide', () => this.dispose());
+    this.listen(window, 'keydown', event => {
+      const direction = navigationDirection(event);
+      if (direction && this.navigate(direction)) event.preventDefault();
+    });
     for (const section of ['library', 'play', 'analytics']) this.listen(document.getElementById('nav-' + section), 'click', () => this.setSection(section));
     for (const mode of ['focus', 'grid']) this.listen(document.getElementById('mode-' + mode), 'click', () => this.setMode(mode));
     for (const key of ['pauseWhenHidden', 'resumeWhenVisible']) {
@@ -68,6 +76,24 @@ export class ConsoleApp {
     if (!this.workspace || this.disposed) return;
     this.presentation.sync(this.workspace.records, { section: this.section, mode: this.workspace.mode,
       selectedId: this.workspace.selectedId, hidden: this.document.hidden, preferences: this.preferences });
+    if (this.gridResults) {
+      const views = new Map();
+      if (this.section === 'play' && this.workspace.mode === 'grid' && !this.document.hidden) {
+        for (const [id, r] of this.workspace.records) if (r.frame && !r.retired && !r.card.hidden) views.set(id, { frame: r.frame, gameId: r.snapshot.gameId });
+      }
+      this.gridResults.setViews(views, this.selectedId, { hidden: this.document.hidden });
+    }
+  }
+  navigate(direction, sourceId = this.workspace.keyboardId || this.workspace.selectedId) {
+    if (this.disposed || this.document.hidden || this.section !== 'play' || this.workspace.mode !== 'grid') return false;
+    const ids = [...this.workspace.records].filter(([, r]) => r.frame && !r.card.hidden && !r.retired && r.snapshot.state === 'running').map(([id]) => id);
+    if (!ids.length || (sourceId && !ids.includes(sourceId)) || !['previous', 'next'].includes(direction)) return false;
+    const index = ids.indexOf(sourceId), id = ids[(index + (direction === 'next' ? 1 : -1) + ids.length) % ids.length];
+    this.selection++; this.selectedId = id; this.workspace.focus(id);
+    for (const [key, row] of this.rows) row.select.setAttribute('aria-pressed', String(key === id));
+    this.document.getElementById('selected-title').textContent = this.name(this.snapshots.get(id)) + ' · ' + shortId(id);
+    this.window.history?.replaceState(null, '', this.window.location.pathname + '?match=' + encodeURIComponent(id));
+    void this.results.setKey(id); return true;
   }
   setMode(mode) {
     this.workspace.setMode(mode);
@@ -210,6 +236,7 @@ export class ConsoleApp {
   dispose() {
     if (this.disposed) return; this.disposed = true; this.selection++;
     for (const resource of [this.results, this.dashboard, this.sessions]) resource.dispose();
+    this.gridResults.dispose();
     for (const unsubscribe of this.unsubscribers) unsubscribe(); for (const remove of this.listeners) remove();
     this.presentation.dispose(); this.workspace.dispose(); this.bridge.dispose(); this.library.dispose(); this.list.replaceChildren(); this.historyList.replaceChildren(); this.rows.clear();
   }

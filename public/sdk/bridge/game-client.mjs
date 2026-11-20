@@ -1,4 +1,4 @@
-import { BridgeError, copyJSON, envelope, fingerprint, randomId, validateMessage } from './protocol.mjs';
+import { BridgeError, copyJSON, envelope, fingerprint, randomId, validateMessage, navigationDirection } from './protocol.mjs';
 
 /** Browser-only facade. No SDK handles, HTTP routes, rules or analytics. */
 export function createGameBridgeClient({ window = globalThis.window, hostOrigin = new URL(import.meta.url).origin, crypto = globalThis.crypto } = {}) {
@@ -15,7 +15,7 @@ export function createGameBridgeClient({ window = globalThis.window, hostOrigin 
   const rejectAll = () => { for (const request of pending.values()) request.reject(new BridgeError('BRIDGE_DETACHED', request.kind === 'ACTION_REQUEST')); pending.clear(); };
   const dispose = () => {
     if (disposed) return;
-    disposed = true; rejectAll(); window.removeEventListener('message', receive); window.removeEventListener('load', ready);
+    disposed = true; rejectAll(); window.removeEventListener('message', receive); window.removeEventListener('load', ready); window.removeEventListener('keydown', navigate);
     for (const set of Object.values(subscribers)) set.clear(); channel = undefined; identity = null; snapshot = null; presentation = null;
   };
   const receive = (event) => {
@@ -70,6 +70,14 @@ export function createGameBridgeClient({ window = globalThis.window, hostOrigin 
     if (type === 'presentation' && presentation) { try { callback(copyJSON(presentation)); } catch {} }
     return () => subscribers[type].delete(callback);
   };
+  const navigate = event => {
+    const direction = navigationDirection(event);
+    if (!direction || disposed || !channel) return;
+    event.preventDefault();
+    // Navigation has no SDK action/result or retry identity, and never changes lock ownership.
+    try { window.parent.postMessage(envelope('NAVIGATION_REQUEST', randomId(crypto), { direction }, channel), hostOrigin); } catch { /* No game action was submitted. */ }
+  };
+  window.addEventListener('keydown', navigate);
   ready();
   window.addEventListener('load', ready); // READY before and after load tolerates iframe/module event ordering.
   return Object.freeze({

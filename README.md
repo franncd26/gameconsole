@@ -90,6 +90,10 @@ HTTPS canónico, sin ruta, query ni credenciales. No se confía en Forwarded del
 4. En Partidas, elegir una en la lista compacta o activar Cuadrícula para ver varias.
    Seleccionar o cambiar de sección conserva los iframe. Diagnóstico permite ocultar
    o restablecer una vista; restablecer crea un iframe nuevo para la misma partida.
+   Cada tarjeta de cuadrícula muestra sus propias estadísticas de GameStats. Ctrl +
+   Alt + J / K recorre y enfoca juegos activos, también desde dentro de un iframe.
+   Los atajos no transfieren el control entre pestañas. Más métricas y patrones
+   conserva el acceso al resultado analítico completo.
 5. Nueva pestaña abre `/?match=<id>`: comparte la misma partida y UUID;
    **no crea una instancia adicional**. Puede haber conflictos de versión entre
    clientes. Recargar recupera las partidas del proceso, sin persistencia durable.
@@ -106,6 +110,10 @@ Con Web Locks, otra pestaña de la misma partida entra como observadora y puede
 Tomar control de manera ordenada. Sin soporte se advierte que no hay exclusividad
 garantizada. No coordina navegadores o equipos diferentes.
 Consultar [comportamiento y límites de 3H](docs/sdk-v1/phase-3h-game-experience.md).
+La [Fase 3I.1](docs/sdk-v1/phase-3i1-multigame-ux.md) mantiene Pausa estable durante
+ticks normales, permite pausar una acción pendiente y añade estadísticas por tarjeta
+con consultas compartidas y acotadas. La primera sincronización y los errores se
+siguen mostrando; no se ocultan operaciones inciertas ni se alteran reglas.
 Finalizar es administrativo; no fabrica victoria ni carrera completada.
 Al confirmarse finished, la vista muestra brevemente el final y libera su canal
 tras 1,8 s. La partida queda en el historial plegable con sus resultados; consultarla

@@ -1,5 +1,9 @@
 # Fase 3H — Actividad local, preferencias y control entre pestañas
 
+[3I.1](phase-3i1-multigame-ux.md) distingue las actualizaciones normales del estado
+Sincronizando, añade resúmenes analíticos por tarjeta y NAVIGATION_REQUEST. Conserva
+las preferencias y el control entre pestañas descritos aquí.
+
 Base `9553f39f43add6651342f61d0523ed516737c76f`, rama feature/gameconsole-sdk-v1.
 El estado oficial y sus versiones siguen perteneciendo al SDK. Esta fase solo
 cambia el navegador: no añade PAUSE/RESUME ni altera duraciones o métricas.

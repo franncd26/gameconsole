@@ -2,9 +2,10 @@ import { BridgeError, copyJSON, envelope, fingerprint, randomId, validateMessage
 
 /** One association per iframe. The SDK remains the sole execution queue and state authority. */
 export class HostBridge {
-  #window; #fetch; #crypto; #records = new Map(); #usedFrames = new WeakSet(); #drains = new WeakMap(); #listener; #observer; #status;
-  constructor({ window = globalThis.window, fetcher = (...args) => globalThis.fetch(...args), crypto = globalThis.crypto, onStatus = () => {} } = {}) {
+  #window; #fetch; #crypto; #records = new Map(); #usedFrames = new WeakSet(); #drains = new WeakMap(); #listener; #observer; #status; #navigate;
+  constructor({ window = globalThis.window, fetcher = (...args) => globalThis.fetch(...args), crypto = globalThis.crypto, onStatus = () => {}, onNavigate = () => {} } = {}) {
     this.#window = window; this.#fetch = fetcher; this.#crypto = crypto; this.#status = onStatus;
+    this.#navigate = onNavigate;
     this.#listener = (event) => { void this.#receive(event); };
     window.addEventListener('message', this.#listener);
     if (window.MutationObserver && window.document?.documentElement) {
@@ -139,6 +140,14 @@ export class HostBridge {
     if (m.type === 'READY') { await this.#ready(r, m); return; }
     if (!r.channel || r.channel !== m.channelId) { this.#notify(r, 'error', 'INVALID_CHANNEL'); return; }
     const generation = r.generation;
+    if (m.type === 'NAVIGATION_REQUEST') {
+      r.navigationIds ||= new Set();
+      if (r.navigationIds.has(m.messageId)) return;
+      r.navigationIds.add(m.messageId);
+      if (r.navigationIds.size > 32) r.navigationIds.delete(r.navigationIds.values().next().value);
+      try { this.#navigate({ matchId: r.matchId, direction: m.payload.direction }); } catch { /* Independent host UI. */ }
+      return;
+    }
     if (m.type === 'SNAPSHOT_REQUEST') {
       if (r.requests.has(m.messageId)) return this.#error(r, m.messageId, 'MESSAGE_CONFLICT');
       if (r.reading) return this.#error(r, m.messageId, 'BRIDGE_BUSY');
