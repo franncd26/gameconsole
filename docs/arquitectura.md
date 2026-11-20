@@ -1,75 +1,96 @@
-# Arquitectura y decisiones
+# Arquitectura y decisiones técnicas
 
-La aplicación utiliza módulos JavaScript nativos, Node.js 22 y SWI-Prolog.
-No necesita un framework ni paquetes npm para sus funcionalidades. Es una
-elección de alcance: tres juegos pequeños, integración HTTP y entrega Docker.
+GameConsole separa la interfaz anfitriona, el runtime SDK, los videojuegos y la
+analítica. La configuración académica carga Gato, Snake y Circuito; el anfitrión
+selecciona paquetes por metadatos y confianza, sin condiciones por gameId en la API SDK.
 
 ```text
-Navegadores independientes
-    │ HTTP mismo origen
-    ▼
-GameConsole Node.js ── entrada/salida JSON ── SWI-Prolog / minimax
-    │ cola ordenada por partida
-    │ POST /events
-    ▼
-GameStats Go ── snapshots HTTP ── GameStats Scala
-    ▲                                  │
-    └──── estadísticas de partida y resumen
+Consola web → HostBridge ↔ iframe del plugin / GameBridgeClient
+                    ↓ HTTP /api/sdk/
+Registry → Loader → Factory → GameInstanceManager → Session / Rules
+                                      │                 │
+                                      │         Gato → PrologAdapter → SWI-Prolog
+                                      ↓
+                     GameEventAdapter → OutboxEventSink → EventOutbox
+                                                           ↓
+                                                    GameStats Go
+                                                           ↓
+                                                    GameStats Scala
 ```
 
-## Orientación a objetos
+## Paquetes y orientación a objetos
 
-`Match` abstrae identidad, estado, eventos y ciclo de vida. `TicTacToe`, `Snake`
-y `Racing` encapsulan reglas y estado, especializan `action` y `snapshot` y
-comparten inicio/cierre mediante herencia justificada. `EventOutbox` separa el
-transporte del dominio. `GameConsole` coordina la interfaz y sus controles.
-Los snapshots son copias para que el consumidor no modifique el estado interno.
-Las solicitudes de una misma partida se serializan con `exclusive`; las demás
-partidas progresan independientemente. El servidor mantiene las reglas y la IA.
+Cada paquete de `plugins/` contiene `game.json`, módulos de servidor, recursos web
+y perfil analítico. `GatoRules`, `SnakeRules` y `RacingRules` encapsulan reglas y
+física; sus clases Session coordinan acciones con el contexto SDK. Gato incluye
+su propio adaptador y programa Prolog. Los plugins no importan las clases históricas
+del host ni comparten estado mutable de partida.
 
-## Prolog
+Cada sesión usa una celda `context.createState`. Una transición propone nuevos
+datos y sus eventos mediante `confirmTransition`; el host controla aceptación,
+ciclo de vida y versión pública. Las vistas solo representan snapshots y envían
+intenciones. No deciden victorias, colisiones, IA ni estadísticas.
 
-Los tres niveles se ejecutan en Prolog: baja toma una victoria inmediata o una
-casilla libre; media agrega bloqueo de amenazas y preferencia por el centro;
-alta conserva minimax completo. No hay selección aleatoria de movimientos.
-La configuración se registra en MATCH_STARTED y la interfaz propone media.
+## Runtime y concurrencia
 
-El tablero se representa con nueve átomos: X, O y e. Las reglas reconocen líneas
-ganadoras, generan movimientos legales y exploran estados alternando jugadores.
-Minimax maximiza para O y minimiza para X: victoria O = 10, empate = 0,
-victoria X = -10. Una preferencia centro/esquinas/bordes desempata decisiones
-óptimas. Tabling memoriza subproblemas dentro de la consulta.
+- **GameRegistry:** descubre y valida metadatos sin importar código.
+- **GamePluginLoader:** carga exclusivamente módulos registrados y confiables y
+  comprueba su interfaz. Descubrimiento no equivale a autorización.
+- **GameSessionFactory:** aplica opciones/defaults y valida participantes, datos
+  iniciales y una sesión independiente antes de publicarla.
+- **GameInstanceManager:** mantiene un Map por UUID, serializa operaciones de cada
+  partida y administra lifecycle, versiones e historial acotado de requestId.
 
-Node ejecuta el intérprete con argumentos fijos, sin shell ni código construido
-con datos del usuario. Envía JSON por stdin y consume la respuesta por stdout.
-Hay timeout y validación de la casilla devuelta. Si falla la IA, el movimiento
-humano se conserva y la interfaz permite reintentar el turno de Prolog.
+Los tres manifiestos permiten múltiples instancias. Una partida no bloquea a otra;
+la validación genérica de `multipleInstances:false` sigue disponible para otros
+paquetes. Abrir el mismo UUID en otra pestaña crea otra vista de la misma sesión.
+Web Locks coordina el control local entre pestañas compatibles; el servidor conserva
+la autoridad y no existe exclusión global entre equipos.
 
-Referencias: [JSON en SWI-Prolog](https://www.swi-prolog.org/pldoc/man?section=json)
-y [procesos de Node.js](https://nodejs.org/api/child_process.html).
+## Presentación, Bridge y Prolog
 
-## Concurrencia y fallos
+ConsoleApp, CatalogView, MatchWorkspace y StatsPanel distribuyen responsabilidades
+del host. Un Map mantiene contenedores e iframe estables al cambiar selección o
+estadísticas. El Bridge valida mensajes, fuente, origen y canal por iframe.
+Los juegos se cargan con `sandbox="allow-scripts"`, sin allow-same-origin.
+Origen opaco no autentica por sí solo un documento; navegar exige un montaje nuevo.
 
-Cada partida usa UUID, estado propio y cola de eventos independiente. El inicio
-se entrega antes de sus acciones y el cierre después de ellas. No se espera la
-red de GameStats para continuar jugando. Los reintentos usan espera creciente;
-un 409 solo se reconoce como duplicado entregado si GameStats confirma el ID.
-Una caída mantiene los eventos pendientes en memoria mientras vive Node.
+Visibilidad, pausa manual y reanudación son estados locales de presentación.
+No modifican el lifecycle SDK ni los tiempos analíticos. Las consultas estadísticas
+se acotan y no participan en la cola de acciones.
 
-El almacenamiento en memoria no garantiza recuperación ante reinicio o apagado.
-No se promete entrega exactamente una vez. Reiniciar Go durante partidas requiere
-una nueva sesión: su historial previo y su ciclo de vida se pierden.
+Gato ejecuta sus tres estrategias en SWI-Prolog: reglas básicas, reglas tácticas y
+minimax. Node invoca un proceso sin shell, con timeout, límites de salida y validación
+de la respuesta. La jugada humana se confirma antes de consultar la IA; si falla
+la dependencia, la X permanece y RETRY_AI puede continuar con otra solicitud.
 
-El resumen se calcula en Scala, sobre una colección consistente por partida,
-sin transacción global entre todas ellas. No se promedian promedios ni se suman
-métricas de unidades diferentes. Los datos inválidos se señalan como parciales.
-La consola presenta estos resultados, sin recalcularlos.
+## Eventos, analítica y patrones
 
-## Alcance y límites
+| Patrón | Aplicación y razón |
+| --- | --- |
+| Registry y Factory | Separan catálogo, carga confiable y construcción de sesiones; evitan seleccionar clases por gameId. |
+| Adapter | GameEventAdapter crea el sobre v1; OutboxEventSink adapta aceptación local al transporte existente; PrologAdapter delimita el proceso externo. |
+| Facade | API SDK, ConsoleAPI y Bridge ofrecen operaciones genéricas sin exponer handles internos al navegador. |
+| Observer | Suscriptores de Bridge y recursos estadísticos actualizan vistas mediante copias defensivas. |
+| State | Lifecycle del host y celda de dominio delimitan autoridades y transiciones; no hay una segunda versión mutable en el plugin. |
+| Dependency Injection | Contexto, sink, fetcher, reloj, aleatoriedad y adaptador de IA permiten aislamiento y pruebas deterministas. |
 
-Gato aplica las reglas completas del juego; GameStats analiza evidencia.
-Snake registra comida y muerte, sin enviar cada fotograma. Circuito registra
-vueltas y choques, sin usar GameStats como reloj o motor de física.
-El servidor admite hasta 500 partidas por sesión; el resumen está limitado a
-8 MiB y cada partida respeta los límites propios de GameStats.
-No se incorporan cuentas, multijugador remoto, base de datos o servicios de pago.
+EventOutbox conserva orden por matchId, reintenta fallos y verifica un 409 por eventId.
+La aceptación de un lote es completa en memoria, no una transacción durable con Go.
+Go organiza eventos y snapshots; Scala interpreta perfiles y calcula métricas y
+patrones. GameConsole no sustituye esos cálculos por sumas o promedios locales.
+
+## Compatibilidad y extensión experimental
+
+`server/games.mjs`, sus clases Match/TicTacToe/Snake/Racing y las rutas `/api/matches`
+pertenecen a la implementación histórica de compatibilidad. No son la base de los
+plugins actuales. Con SDK deshabilitado, `/` conserva esa interfaz histórica.
+
+El [importador experimental](sdk-v1/phase-3i2-plugin-importer.md) agrega paquetes
+autorizados al registro vivo sin reemplazar el Manager. Publica perfiles persistentes
+y un supervisor reinicia solo el proceso Scala, con verificación de carga y rollback.
+Está separado del entorno académico; no permite ejecutar JAR directamente.
+
+Límites: memoria no durable, 500 partidas, 32 canales por HostBridge, sin cuentas
+ni entrega exactamente una vez. El sandbox web no protege al host de código Node
+no confiable. Los [contratos HTTP y eventos](integracion.md) detallan los fallos.

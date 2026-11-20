@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#11121a"><title>GameConsole · Juega y descubre</title>
+  <link rel="stylesheet" href="/sdk/console.css"><script type="module" src="/sdk/console.mjs"></script>
+</head>
+<body>
+  <header class="topbar"><a class="brand" href="/">gc<span>game<strong>console</strong><small>PLAY. THINK. REPEAT.</small></span></a>
+    <nav aria-label="Secciones"><button id="nav-library" aria-pressed="true">Biblioteca</button><button id="nav-play" aria-pressed="false">Partidas</button><button id="nav-analytics" aria-pressed="false">Estadísticas</button></nav>
+    <span class="course">Lenguajes de Programación · SDK v1</span>
+  </header>
+  <main>
+    <details class="settings"><summary>Ajustes de juego</summary><label><input id="pauseWhenHidden" type="checkbox" checked> Pausar al ocultar el juego</label><label><input id="resumeWhenVisible" type="checkbox" checked> Reanudar automáticamente al regresar</label><p>Controla solo la actividad de esta vista, no una pausa compartida del servidor. En segundo plano el navegador puede limitar la frecuencia.</p><p id="preferences-status" role="status"></p></details>
+    <p id="notice" class="notice" role="status" aria-live="polite">Preparando tu biblioteca…</p>
+    <section id="library" class="library"><div class="section-heading"><div><p class="eyebrow">TU PRÓXIMA PARTIDA</p><h1>Una consola. Nuevos desafíos.</h1><p class="muted">Elige un plugin, configura tu partida y juega con sus reglas oficiales.</p></div><button id="reload-catalog">Actualizar biblioteca</button></div>
+      <div id="catalog" class="catalog"></div>
+      <div id="plugin-importer" class="importer" hidden><button id="import-game" hidden>Importar juego</button><input id="import-file" type="file" accept=".game.zip" hidden><p id="import-details"></p><button id="import-confirm" hidden>Confirmar instalación de confianza</button><p id="import-status" role="status" aria-live="polite"></p></div>
+    </section>
+    <section id="play" hidden><div class="section-heading"><div><p class="eyebrow">TU ESPACIO</p><h2>Vamos a jugar</h2></div><div class="tools"><button id="mode-focus" aria-pressed="true">Una partida</button><button id="mode-grid" aria-pressed="false">Cuadrícula</button><button id="reload-matches">Actualizar</button></div></div>
+      <p id="sessions-status" class="muted">Consultando partidas…</p>
+      <p class="muted">En cuadrícula: Ctrl + Alt + J / K cambia el juego que recibe el teclado. Cada tarjeta muestra sus propias estadísticas.</p>
+      <div class="play-layout"><aside class="session-sidebar" aria-label="Partidas activas"><h3>En juego</h3><p class="muted">Elige una partida o crea otra desde la biblioteca.</p><ul id="match-list"></ul></aside>
+        <div class="play-stage"><p id="workspace-empty" class="empty-state">Selecciona una partida activa para jugar. Los resultados terminados están en el historial.</p><div id="workspace" class="workspace" aria-label="Ventanas de juego"></div></div>
+        <aside class="stats-sidebar" aria-label="Estadísticas de la partida seleccionada"><p class="eyebrow">TU PARTIDA</p><h2>Resultados</h2><p id="selected-title" class="identity">Selecciona una partida</p><button id="reload-stats">Actualizar estadísticas</button><p id="result-status" role="status">Sin consulta</p><div id="results"></div></aside>
+      </div>
+      <details id="history" class="history"><summary>Historial de partidas finalizadas</summary><p class="muted">Consulta resultados y snapshots oficiales. Las partidas se conservan en el servidor mientras siga en ejecución.</p><ul id="history-list"></ul><div id="history-workspace"></div></details>
+    </section>
+    <section id="analytics" hidden><p class="eyebrow">GAMESTATS</p><h2>Tu actividad, en perspectiva</h2><p class="muted">Estadísticas generales y por videojuego, calculadas por GameStats a partir de los eventos recibidos.</p><p id="dashboard-status" role="status">Consultando…</p><div id="dashboard" class="dashboard"></div></section>
+  </main>
+  <footer>GameConsole · Proyecto de Lenguajes de Programación · Las partidas y el historial viven en la memoria del servidor.</footer>
+</body></html>

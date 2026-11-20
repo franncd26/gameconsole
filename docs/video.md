@@ -1,25 +1,31 @@
-# Guion de demostración
+# Guion interno de demostración — 12 a 13 minutos
 
-Duración sugerida: 8 a 12 minutos. Grabar la versión verificada después de
-revisarla con los dos integrantes. El video final debe publicarse con un enlace
-de acceso público y adjuntarse a Tec Digital.
+El guion organiza la grabación; no constituye evidencia de un video terminado.
+Usar la revisión validada del proyecto y mantener la duración por debajo de 15 minutos.
 
-1. **Presentación, 1 min:** autores, objetivo y los dos repositorios. Explicar
-   que GameConsole produce eventos y GameStats los analiza con Go/Scala.
-2. **Ejecución, 1 min:** mostrar Docker Compose, tres servicios saludables y la
-   dirección local. Explicar el despliegue reproducible y el pipeline de GitHub.
-3. **Gato y Prolog, 2 min:** jugar, mostrar la jugada de la computadora y su
-   evaluación. Explicar generación de estados, reglas terminales y minimax.
-   Mostrar las clases de dominio y las reglas Prolog relevantes.
-4. **Snake, 1 min:** mover, comer una manzana, comprobar los puntos y finalizar
-   por colisión. Mostrar incremento y evento de muerte.
-5. **Circuito, 1 min:** acelerar, cambiar carril, evitar/chocar obstáculos y
-   completar vueltas. Mostrar sus tiempos en GameStats.
-6. **Concurrencia, 2 min:** abrir partidas en pestañas diferentes, identificar
-   sus IDs y consultar el panel mientras alguna sigue abierta. Mostrar que los
-   resultados pertenecen a la partida correcta y los contadores se actualizan.
-7. **Calidad, 1 min:** mostrar pruebas aprobadas, documentación y manejo visible
-   de errores. Explicar que los datos están en memoria y el panel no recalcula.
+| Tiempo | Contenido |
+| --- | --- |
+| 0:00–0:45 | Autores, objetivo académico y separación entre consola, Prolog, Go y Scala. |
+| 0:45–1:45 | Tres servicios Compose saludables; consola SDK y catálogo de los tres juegos. |
+| 1:45–3:45 | Gato: dificultad, X humana y O de Prolog real; decisión observable y resultado. |
+| 3:45–5:00 | Snake: controles, manzana, puntos confirmados y cierre por colisión. |
+| 5:00–6:45 | Circuito: carriles, aceleración/freno, obstáculos, vueltas y tiempos. |
+| 6:45–8:00 | Partidas independientes, cuadrícula, Ctrl+Alt+J/K y cuatro Circuitos con UUID distintos; Nueva pestaña comparte una sesión. |
+| 8:00–9:15 | Métricas por partida y generales; provisional/final, source/basis y distinción entrega/análisis. |
+| 9:15–10:15 | POO, Registry/Factory, Adapter/Facade, Observer y autoridad del servidor. |
+| 10:15–11:15 | Estado real de CI del SHA presentado, artefacto de integración y deployment local. Si sigue pendiente, indicarlo expresamente. |
+| 11:15–12:00 | Fallos y recuperación: X confirmada, RETRY_AI, eventos pendientes, memoria y apagado. |
+| 12:00–13:00, opcional | Importador como experimento separado: Wall Defender, dos sesiones y métricas. No presentar rollback o victoria de nueve oleadas como verificados. |
 
-Cerrar con los resultados de la ejecución integrada. Evitar exponer pestañas,
-notificaciones o información personal ajena al proyecto durante la grabación.
+Preparar partidas avanzadas o editar esperas con transparencia; no alterar física,
+relojes ni resultados para simular una carrera completa. Las demos con analítica
+simulada no prueban Go/Scala y deben identificarse si se muestran.
+
+Mostrar Ajustes: blur libera entradas; suspensión por visibilidad y reanudación
+son locales. Pausa manual se conserva. Observador/Tomar control requiere Web Locks
+y no constituye autorización global. Al finalizar, revisar resultados en el historial
+sin fabricar otro cierre.
+
+Antes de publicar: comprobar audio, privacidad, acceso al enlace, autores y duración.
+Guardar la URL/run/SHA de Actions solo si existen. Grabación y enlace definitivo
+permanecen pendientes en el [registro de entrega](entrega.md).

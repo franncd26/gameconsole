@@ -1,0 +1,46 @@
+name: gameconsole-importer
+services:
+  scala-analysis:
+    image: gameconsole-importer-scala:local
+    build: { context: ., dockerfile: deployment/importer/Dockerfile.scala }
+    environment: { SCALA_HOST: 0.0.0.0, SCALA_PORT: "9000" }
+    volumes:
+      - "${GAMECONSOLE_IMPORT_PROFILES:-./.local/importer/profiles}:/shared-profiles:ro"
+      - "${GAMECONSOLE_IMPORT_STATE:-./.local/importer/control}:/reload-status"
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  go-ingestion:
+    image: gameconsole-gamestats-go:local
+    environment: { SCALA_SERVICE_URL: "http://scala-analysis:9000" }
+    ports: ["127.0.0.1:${GAMESTATS_PORT:-8081}:8080"]
+    depends_on: { scala-analysis: { condition: service_healthy } }
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+  gameconsole:
+    image: gameconsole-importer:local
+    build: { context: ., dockerfile: deployment/importer/Dockerfile.node }
+    environment:
+      GAMECONSOLE_SDK_ENABLED: "1"
+      GAMECONSOLE_PLUGINS_DIR: /app/plugins
+      GAMECONSOLE_TRUSTED_IDS: tic-tac-toe,snake,racing
+      GAMESTATS_URL: http://go-ingestion:8080
+      GAMECONSOLE_IMPORT_ENABLED: "1"
+      GAMECONSOLE_IMPORT_DIR: /var/lib/gameconsole/importer
+      GAMECONSOLE_IMPORT_PROFILES_DIR: /shared-profiles
+      GAMECONSOLE_IMPORT_SCALA_URL: http://scala-analysis:9000
+      GAMECONSOLE_IMPORT_STATE_DIR: /reload-status
+    volumes:
+      - "${GAMECONSOLE_IMPORT_DATA:-./.local/importer/data}:/var/lib/gameconsole/importer"
+      - "${GAMECONSOLE_IMPORT_PROFILES:-./.local/importer/profiles}:/shared-profiles"
+      - "${GAMECONSOLE_IMPORT_STATE:-./.local/importer/control}:/reload-status:ro"
+    ports: ["127.0.0.1:${PORT:-3001}:3000"]
+    depends_on: { go-ingestion: { condition: service_healthy } }
+    init: true
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_grace_period: 12s
