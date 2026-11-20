@@ -15,20 +15,24 @@ La configuración de entrega contiene **exactamente tres juegos**:
 | **Snake** | Movimiento, comida, crecimiento y colisiones; tableros de 12, 20 o 28 casillas por lado. | Flechas, WASD o controles en pantalla. |
 | **Circuito** | Carrera de tres carriles con obstáculos, aceleración, frenado y tres vueltas. | A/D o izquierda/derecha para cambiar de carril; W/arriba para acelerar y S/abajo para frenar. |
 
+**También se incluye un importador de videojuegos mediante paquetes `.game.zip`.** Funciona en un entorno separado, accesible en **http://127.0.0.1:3001/**, con un ejemplo listo para empaquetar y probar. Véase [Cómo probar el importador](#importador-de-videojuegos-extensión-adicional). El entorno académico se abre en el puerto **3000** y presenta los tres juegos obligatorios.
+
 ## Requisitos
 
 - Git, **Node.js 22** y Docker Engine o Docker Desktop con contenedores Linux.
 - Docker Compose v2, compatible con `up --wait`.
 - Conexión a Internet durante la primera construcción, para obtener imágenes y dependencias.
 
-No es necesario instalar Go, Scala ni SWI-Prolog en el equipo anfitrión: se incluyen en los contenedores. El repositorio **GameStats** se prepara automáticamente en la revisión indicada en `gamestats.lock.json`. Para clonar los repositorios privados se requiere acceso autorizado a GitHub.
+Antes de comenzar, iniciar Docker Desktop o Docker Engine y comprobar que `node --version` y `docker compose version` funcionan. La versión principal de Node debe ser **22**.
+
+No es necesario instalar Go, Scala ni SWI-Prolog en el equipo anfitrión **para ejecutar la consola**: se incluyen en los contenedores. GameStats se prepara automáticamente desde el repositorio y la revisión especificados en [`gamestats.lock.json`](gamestats.lock.json). Las fuentes son públicas y pueden clonarse sin credenciales de GitHub.
 
 ## Instalación y deployment
 
 Desde PowerShell o una terminal con Node y Docker disponibles:
 
 ```powershell
-git clone https://github.com/JusMH/gameconsole.git
+git clone https://github.com/franncd26/gameconsole.git
 cd gameconsole
 node scripts/deploy.mjs
 ```
@@ -57,6 +61,18 @@ node scripts/deploy.mjs --stop
 
 El deployment es reproducible mediante Docker Compose **en un entorno local**; no requiere un sitio web alojado públicamente. Se pueden ajustar los puertos expuestos con `PORT` y `GAMESTATS_PORT`.
 
+## Verificación rápida de la instalación
+
+Estas comprobaciones permiten evaluar el funcionamiento sin instalar Go, Scala ni Prolog en el equipo anfitrión:
+
+1. Ejecutar `docker compose -p gameconsole ps` y confirmar que los tres servicios (`gameconsole`, `go-ingestion`, `scala-analysis`) están saludables.
+2. Abrir **http://127.0.0.1:3000/** y comprobar que **Biblioteca** muestra exactamente **Gato, Snake y Circuito**.
+3. Iniciar **Gato** en dificultad alta, colocar una X y observar la respuesta de la computadora, calculada mediante Prolog.
+4. Iniciar partidas de **Snake** y **Circuito**, entrar en **Partidas → Cuadrícula** y comprobar que funcionan simultáneamente. Se pueden crear también varias instancias de un mismo videojuego.
+5. Consultar las estadísticas de una partida y abrir la sección **Estadísticas** para comprobar los resultados generales y por videojuego. Los valores se actualizan periódicamente mientras se generan eventos.
+
+Para una validación automatizada con los servicios reales, consultar la sección de pruebas. Ejecutarla **sin otras partidas abiertas ni productores de eventos simultáneos**, porque crea y finaliza partidas de prueba.
+
 ## Uso de la consola
 
 1. Seleccionar un videojuego en **Biblioteca**, configurar sus opciones y crear una partida.
@@ -69,9 +85,62 @@ Una partida también puede abrirse en otra pestaña mediante `/?match=<id>`; se 
 
 En Snake y Circuito, **Jugar / Pausa / Continuar** controla la actividad del cliente. Las preferencias de suspensión al ocultar la página están disponibles en **Ajustes**. Los atajos **Ctrl+Alt+J/K** permiten cambiar el juego enfocado, si el navegador no los reserva.
 
+## Importador de videojuegos (extensión adicional)
+
+Además de los tres videojuegos exigidos para el proyecto, se implementó un **importador de plugins**. Permite instalar un nuevo juego web junto con sus reglas y perfil de estadísticas, siempre que el paquete cumpla el contrato común del SDK. GameConsole registra el plugin, Go recibe sus eventos v1 y Scala analiza los resultados según el perfil aportado. La consola no necesita conocer previamente las reglas del juego.
+
+Este componente **sí está incluido y es ejecutable**. Se despliega por separado para no alterar el catálogo académico:
+
+| Entorno | Dirección | Qué permite |
+| --- | --- | --- |
+| Académico | **http://127.0.0.1:3000/** | Gato, Snake y Circuito; importación deshabilitada. |
+| Importador | **http://127.0.0.1:3001/** | Los tres juegos iniciales y la opción **Importar juego**. |
+
+### Instalación y prueba paso a paso
+
+Desde la raíz de GameConsole, con Docker iniciado:
+
+```powershell
+node scripts/deploy-importer.mjs
+```
+
+Esperar a que los servicios estén saludables y abrir **http://127.0.0.1:3001/**. El importador experimental necesita un navegador local y no debe exponerse en una red pública.
+
+Para probarlo **sin descargar un juego externo**, el proyecto incluye el ejemplo **Contador importado** en `test/fixtures/import-demo/`. Preparar su ZIP ejecutando (requiere **Python 3 local**, incluido `py -3` en Windows):
+
+```powershell
+node scripts/package-import-demo.mjs
+```
+
+El script genera `evidence/import-demo.game.zip`. Después, en la consola del **puerto 3001**:
+
+1. Seleccionar **Biblioteca → Importar juego**.
+2. Elegir `evidence/import-demo.game.zip`.
+3. Revisar la vista previa y **confirmar la instalación de confianza**.
+4. Comprobar que aparece **Contador importado** en Biblioteca; crear una o dos partidas.
+5. Pulsar **Incrementar** en una de ellas y consultar las estadísticas: el evento `COUNTER_INCREMENTED` se entrega a Go y el perfil del plugin permite a Scala calcular **Incrementos confirmados**. Completar la partida para ver el resultado final.
+
+Este ejemplo demuestra que los videojuegos, el registro de sesiones y los perfiles analíticos se pueden extender **sin añadir condiciones específicas del juego a GameConsole ni sustituir el cálculo de GameStats**.
+
+También se probó una adaptación web de **Wall Defender**, originalmente hecha en Java. Su paquete `.game.zip` **no está incluido en este repositorio**; para importarlo se necesita disponer del ZIP preparado por el equipo. El importador no ejecuta JAR directamente.
+
+Los plugins y perfiles importados persisten en `.local/importer/` y se recuperan después de reiniciar el entorno; **las partidas no persisten**. Para detenerlo:
+
+```powershell
+node scripts/deploy-importer.mjs --stop
+```
+
+El apagado no borra los paquetes instalados. Para repetir una instalación desde cero, detener primero el importador y apartar o respaldar la carpeta `.local/importer/` antes de volver a iniciarlo. No es necesario limpiar volúmenes ni eliminar imágenes Docker.
+
+**Contrato y límites:** [documentación del importador](docs/sdk-v1/phase-3i2-plugin-importer.md). Solo deben instalarse paquetes de código confiable, ya que los módulos Node se ejecutan con los permisos del proceso.
+
 ## Pruebas y CI/CD
 
-Para las pruebas locales se necesita Node.js 22 y SWI-Prolog disponible en el equipo. Python 3 solo es necesario para las pruebas del importador opcional.
+Las pruebas automatizadas son **opcionales para utilizar la consola**. Para evaluar los tres juegos en el navegador es suficiente con seguir el deployment y la verificación rápida.
+
+- `npm run check` requiere Node.js 22 y comprueba la sintaxis.
+- `npm test` requiere Node.js 22, **SWI-Prolog** en `PATH` (o `SWIPL_PATH`) y **Python 3** para las pruebas de paquetes ZIP del importador. Estas son dependencias de las pruebas locales, no de los videojuegos ejecutados en Docker.
+- `npm run test:integration:sdk` comprueba el sistema real con los tres servicios Docker **ya iniciados y saludables**. Prolog se ejecuta dentro de su contenedor; no requiere instalarlo en el equipo anfitrión.
 
 ```powershell
 npm run check
@@ -86,7 +155,35 @@ npm run test:integration:sdk
 
 El comando de integración verifica la creación de partidas, decisiones de Prolog, entrega de eventos a Go, resultados provisionales y finales de Scala y conteos del panel general. Genera `evidence/sdk-integration.json`.
 
-El pipeline de GitHub Actions ejecuta las pruebas, construye Docker y realiza una integración con los servicios reales. La [ejecución de verificación](https://github.com/JusMH/gameconsole/actions/runs/44814482222) finalizó correctamente; sus trabajos `verify` e `integrated` están aprobados.
+El pipeline de GitHub Actions ejecuta las pruebas, construye Docker y realiza una integración con los servicios reales. La [ejecución de verificación del repositorio original](https://github.com/franncd26/gameconsole/actions/runs/44819352482) finalizó correctamente; sus trabajos `verify` e `integrated` están aprobados.
+
+## Solución de problemas habituales
+
+| Situación | Qué comprobar |
+| --- | --- |
+| `docker` no se reconoce o no conecta con el servicio. | Iniciar Docker Desktop o Docker Engine y ejecutar `docker info` y `docker compose version`. En Windows, utilizar contenedores Linux. |
+| Error de puerto en uso durante el despliegue. | Cerrar el servicio que utiliza ese puerto o cambiar los puertos publicados antes del arranque. |
+| No se puede preparar GameStats. | Comprobar la conexión a Internet y el acceso al repositorio indicado en [`gamestats.lock.json`](gamestats.lock.json). El script descarga automáticamente la revisión requerida. |
+| No aparecen estadísticas inmediatamente. | Generar eventos jugando, esperar la consulta periódica y confirmar que los tres servicios continúan saludables. |
+| Alguna prueba local indica que falta Prolog o Python. | Instalar las dependencias de pruebas indicadas arriba, o utilizar la demostración Docker y la evidencia de GitHub Actions. |
+
+En **PowerShell**, para cambiar los puertos publicados antes de iniciar:
+
+```powershell
+$env:PORT="3002"
+$env:GAMESTATS_PORT="8082"
+node scripts/deploy.mjs
+```
+
+En este ejemplo, GameConsole se abre en `http://127.0.0.1:3002/`. Estos cambios no alteran la comunicación interna de los contenedores.
+
+Para inspeccionar los últimos mensajes de los servicios:
+
+```powershell
+docker compose -p gameconsole logs --tail=100
+```
+
+Para detener el entorno, ejecutar `node scripts/deploy.mjs --stop`.
 
 ## Diseño y limitaciones
 
@@ -94,13 +191,12 @@ La consola separa los módulos de juego, las sesiones, el envío de eventos y la
 
 Las partidas y los eventos aún pendientes residen en memoria: no sobreviven al reinicio de sus respectivos procesos. Tampoco se implementan cuentas ni control global de jugadores entre equipos.
 
-Existe un **importador experimental opcional** para paquetes confiables `.game.zip`, separado del deployment académico de tres juegos. Su uso no es necesario para ejecutar ni evaluar los requisitos del proyecto.
+El **importador de videojuegos** cuenta con su propio procedimiento de instalación y demostración, explicado arriba. Está separado del deployment académico de tres juegos y utiliza paquetes confiables `.game.zip`.
 
 ## Documentación
 
 - [Arquitectura y decisiones técnicas](docs/arquitectura.md)
 - [Eventos, servicios y consultas de GameStats](docs/integracion.md)
 - [Verificación del proyecto](docs/entrega.md)
-- [Guion de demostración](docs/video.md)
 - [Contrato del SDK (consulta complementaria)](docs/sdk-v1/README.md)
-- [Repositorio de GameStats](https://github.com/JusMH/gamestats)
+- [Versión de GameStats utilizada](gamestats.lock.json)

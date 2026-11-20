@@ -4,11 +4,10 @@
 > corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
 > [README principal](../../README.md) y el [estado de entrega](../entrega.md).
 
-Base inspeccionada: `a8fca405cfeb43d074fc889ac65f7f0c31964906`, rama
-`feature/gameconsole-sdk-v1`, árbol limpio antes de editar. El remoto de
-GameConsole está configurado como `https://github.com/JusMH/gameconsole.git`;
-se corrigieron las referencias antiguas del README con esa evidencia local.
-No se certifica acceso público al repositorio ni una ejecución nueva de Actions.
+En esta etapa se verificó la configuración del repositorio de trabajo y se
+revisaron los enlaces de instalación del README. Es un registro histórico y no
+sustituye las instrucciones vigentes del [README principal](../../README.md).
+La ejecución y comprobación definitivas se describen en [verificación](../verificacion.md).
 
 ## IMPLEMENTADO y comprobado de forma ligera
 
