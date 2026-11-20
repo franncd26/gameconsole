@@ -30,6 +30,9 @@ services:
     image: gameconsole:local
     build: .
     environment:
+      GAMECONSOLE_SDK_ENABLED: "1"
+      GAMECONSOLE_PLUGINS_DIR: /app/plugins
+      GAMECONSOLE_TRUSTED_IDS: tic-tac-toe,snake,racing
       GAMESTATS_URL: http://go-ingestion:8080
     ports: ["127.0.0.1:${PORT:-3000}:3000"]
     depends_on:

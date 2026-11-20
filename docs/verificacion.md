@@ -1,5 +1,9 @@
 # Evidencia de verificación
 
+**Registro histórico anterior al despliegue SDK 3F.** Estas comprobaciones no
+certifican las imágenes ni la CI modificadas en 3F. El estado actual y la nueva
+evidencia esperada están en [Fase 3F](sdk-v1/phase-3f-deployment.md).
+
 Revisión realizada el 18 de noviembre de 2026, hora de Costa Rica.
 
 - 12 pruebas Node.js: reglas de los tres juegos, configuración, aislamiento, fallos

@@ -1,4 +1,4 @@
-# GameConsole SDK v1 — Fases 0–3E.3
+# GameConsole SDK v1 — Fases 0–3F
 
 Esta carpeta define el contrato para una evolución incremental. **Están
 implementados manifiestos, registro y la infraestructura local de carga confiable,
@@ -22,6 +22,9 @@ La [Fase 3E.3](phase-3e3-console-stats.md) compone la consola visual SDK, biblio
 genérica, partidas concurrentes y consultas en vivo a GameStats. Con SDK habilitado
 es la página principal; deshabilitado conserva el frontend histórico. No hay
 autenticación nueva. Los fixtures no son un cuarto juego.
+La [Fase 3F](phase-3f-deployment.md) prepara empaquetado Docker, activación SDK
+en Compose, CI main/manual e integración auténtica contra servicios desplegados.
+La nueva construcción y su ejecución real permanecen pendientes de validación.
 
 - [Manifiesto normativo v1](manifest.md): campos, límites y reglas de archivos.
 - [Contrato diseñado de runtime y patrones](runtime-design.md): trabajo futuro.
@@ -36,6 +39,7 @@ autenticación nueva. Los fixtures no son un cuarto juego.
 - [Fase 3E.1 implementada](phase-3e1-web-bridge.md): assets confiables, CSP/sandbox, Bridge v1 y demo de conexión.
 - [Fase 3E.2 implementada](phase-3e2-playable-web-games.md): interfaces, controles, cadencia, recuperación y verificación ligera.
 - [Fase 3E.3 implementada](phase-3e3-console-stats.md): consola principal SDK, opciones dinámicas, pestañas y estadísticas Go/Scala.
+- [Fase 3F preparada](phase-3f-deployment.md): despliegue local, CI y evidencia de integración real pendiente.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada
