@@ -2,7 +2,7 @@ import { BridgeError, copyJSON, envelope, fingerprint, randomId, validateMessage
 
 /** One association per iframe. The SDK remains the sole execution queue and state authority. */
 export class HostBridge {
-  #window; #fetch; #crypto; #records = new Map(); #listener; #observer; #status;
+  #window; #fetch; #crypto; #records = new Map(); #usedFrames = new WeakSet(); #listener; #observer; #status;
   constructor({ window = globalThis.window, fetcher = (...args) => globalThis.fetch(...args), crypto = globalThis.crypto, onStatus = () => {} } = {}) {
     this.#window = window; this.#fetch = fetcher; this.#crypto = crypto; this.#status = onStatus;
     this.#listener = (event) => { void this.#receive(event); };
@@ -28,15 +28,17 @@ export class HostBridge {
   }
   attach(frame, input, { loaded = false } = {}) {
     const snapshot = validateSnapshot(input);
-    if (frame.getAttribute('sandbox') !== 'allow-scripts' || this.#records.has(frame) || this.#records.size >= 32) throw new BridgeError('INVALID_FRAME');
+    if (frame.getAttribute('sandbox') !== 'allow-scripts' || this.#usedFrames.has(frame) || this.#records.size >= 32) throw new BridgeError('INVALID_FRAME');
     const r = { frame, gameId: snapshot.gameId, matchId: snapshot.matchId, snapshot, loaded,
-      generation: 0, channel: null, ready: null, waitingReady: null, requests: new Map(), busy: false, needsSync: false };
+      generation: 0, channel: null, ready: null, requests: new Map(), busy: false, needsSync: false };
     r.load = () => {
-      const waiting = r.waitingReady;
-      this.#invalidate(r, 'reloaded'); r.loaded = true; r.waitingReady = null;
-      if (waiting) void this.#ready(r, waiting);
+      if (r.loaded) {
+        // WindowProxy survives navigation; it does not identify the new document.
+        // Never reconnect that element automatically, or send its replacement an old channel.
+        this.detach(frame, 'reloaded'); this.#notify(r, 'error', 'NAVIGATION_REQUIRES_REMOUNT');
+      } else r.loaded = true; // Pre-load READY is discarded; the client announces again on load.
     };
-    frame.addEventListener('load', r.load); this.#records.set(frame, r); this.#notify(r, 'attached');
+    frame.addEventListener('load', r.load); this.#usedFrames.add(frame); this.#records.set(frame, r); this.#notify(r, 'attached');
     return frame;
   }
   #active(r, generation) { return this.#records.get(r.frame) === r && r.frame.isConnected && r.generation === generation; }
@@ -57,7 +59,7 @@ export class HostBridge {
     this.#notify(r, 'error', code);
   }
   #invalidate(r, reason) {
-    if (r.channel) this.#send(r, 'DETACH', randomId(this.#crypto), { reason });
+    if (r.channel && reason !== 'reloaded') this.#send(r, 'DETACH', randomId(this.#crypto), { reason });
     r.generation++; r.channel = null; r.ready = null; r.requests.clear(); r.busy = false; r.needsSync = false; r.reading = false;
   }
   detach(frame, reason = 'disposed') {
@@ -85,11 +87,8 @@ export class HostBridge {
     } catch { if (this.#active(r, generation)) { r.needsSync = true; this.#error(r, id, 'SNAPSHOT_UNAVAILABLE'); } }
   }
   async #ready(r, m) {
-    if (!r.loaded || (r.ready && r.ready !== m.messageId)) { r.waitingReady = m; return; }
-    if (r.ready === m.messageId) {
-      if (r.channel) this.#send(r, 'INIT', m.messageId, { gameId: r.gameId, matchId: r.matchId, options: r.snapshot.options, snapshot: r.snapshot });
-      return;
-    }
+    // No READY replay/resend and no cross-load mailbox. A live channel never reissues INIT.
+    if (!r.loaded || r.ready !== null || r.channel) return;
     r.ready = m.messageId;
     const generation = r.generation;
     try {

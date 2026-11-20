@@ -22,11 +22,12 @@ export function createApp({
   sdk,
   statsFetcher = fetch,
   sdkHTTP = {},
+  publicOrigin = process.env.GAMECONSOLE_PUBLIC_ORIGIN,
 } = {}) {
   const matches = new Map(),
     outbox = new EventOutbox(statsURL, { fetcher: statsFetcher });
   const sdkRuntime = connectSDK(sdk, outbox);
-  const handleWeb = createWebAssets(sdkRuntime, { bridgeDirectory: path.join(publicDir, 'sdk/bridge') });
+  const handleWeb = createWebAssets(sdkRuntime, { bridgeDirectory: path.join(publicDir, 'sdk/bridge'), publicOrigin });
   const handleSDK = createSDKHTTP(sdkRuntime, {
     ...sdkHTTP, outbox, statsURL, fetcher: statsFetcher,
   });

@@ -87,10 +87,36 @@ La consola y el harness conservan frame-ancestors 'none', script-src/style-src
 política de la API no se relaja ni obtiene CORS.
 
 El plugin recibe default-src 'none', frame-ancestors 'self', script-src limitado
-al árbol web de ese ID y `/sdk/bridge/` en el origen HTTP del host; style/img/font
+al árbol web de ese ID y `/sdk/bridge/` en el origen público HTTP(S) del host; style/img/font
 solo al árbol web (además data: para imágenes), connect-src/frame-src/object-src
 'none', base-uri/form-action 'none'. Se usan fuentes URL explícitas para que el
 origen opaco no dependa de la interpretación de 'self' para scripts.
+
+### Origen público y terminación HTTPS
+
+`createApp({publicOrigin})` admite un origen público explícito. En el arranque
+CLI su valor predeterminado es `GAMECONSOLE_PUBLIC_ORIGIN`, por ejemplo:
+
+```powershell
+$env:GAMECONSOLE_PUBLIC_ORIGIN = 'https://console.example'
+```
+
+La configuración se valida al construir la aplicación: string igual al origen
+canónico devuelto por URL, solo HTTP/HTTPS, autoridad ASCII DNS/IP, sin usuario,
+contraseña, ruta, slash final, query, fragmento ni espacios. Puertos predeterminados
+explícitos que URL normalizaría (p. ej. :443) se rechazan; usar la forma canónica.
+Una configuración inválida falla con INVALID_CONFIGURATION y un mensaje fijo.
+No contiene rutas ni se obtiene de peticiones HTTP.
+
+Cuando está configurado, ese origen fija todas las fuentes CSP de los plugins,
+incluido HTTPS cuando TLS termina en un reverse proxy y Node recibe HTTP interno.
+Sin configuración, se usa Host validado y el esquema de la conexión real:
+socket.encrypted determina HTTPS; en HTTP loopback se conserva http://host:puerto.
+Forwarded, X-Forwarded-Proto y X-Forwarded-Host se ignoran siempre. No se añade
+una opción de confianza genérica en proxies ni una heurística basada en cliente.
+El operador debe configurar el origen externo correcto; esta opción no añade
+TLS, certificados ni valida la configuración del proxy. El resto de CSP/CORS,
+sandbox y rutas históricas permanece igual.
 
 HostBridge.mount crea exactamente `sandbox="allow-scripts"` y referrerpolicy
 no-referrer. attach rechaza permisos sandbox distintos. No se concede
@@ -145,25 +171,53 @@ sin reflejar datos arbitrarios al emisor. INIT se correlaciona con el READY vige
 
 HostBridge permite hasta 32 iframes por objeto; no hay variable global de partida.
 Estados conceptuales: attached/cargando → READY/lectura inicial → initialized;
-un fallo de lectura inicial queda sin canal y puede repetirse ready(). READY
-idéntico no rota el canal; uno con nonce diferente no reasigna una partida y
-espera la siguiente carga del iframe. El evento load invalida la generación
-anterior, historial y canal. El cliente anuncia READY al inicializar y en load
-para tolerar el orden entre módulos, mensaje y evento load.
+un fallo de lectura inicial queda sin canal y puede repetirse ready(). Solo se
+acepta READY tras observar la carga inicial. Los READY anteriores se descartan;
+ya no existe waitingReady ni un buzón que pueda cruzar cargas. El cliente conserva
+sus anuncios al inicializar y en su evento load; ready() permite reiterarlo si
+la integración necesita anunciar disponibilidad después de la carga del padre.
+Mientras se procesa un READY o existe canal, cualquier READY duplicado o distinto
+se ignora: no rota canal, no reenvía INIT ni reserva el nonce de otra generación.
 
-Una recarga necesita nuevo canal. Mensajes tardíos o respuestas HTTP de una
-generación anterior se ignoran; una operación HTTP ya iniciada puede completar
-en el SDK, sin rollback. Tras recargar, consultar el snapshot antes de decidir
-otra acción: no existe replay Bridge automático entre generaciones.
+**Una carga posterior, sea recarga o navegación a otro documento, revoca la
+asociación y no reconecta automáticamente.** Se elimina el registro/listener de
+ese iframe, se invalida la generación, historial y canal, y onStatus informa
+NAVIGATION_REQUIRES_REMOUNT. No se envía INIT ni DETACH con el token antiguo al
+documento de reemplazo. Los READY y acciones de esa WindowProxy retirada se
+ignoran. No se permite volver a attach del mismo elemento en el mismo HostBridge;
+el elemento queda retirado mediante WeakSet, sin retenerlo fuertemente.
+
+El anfitrión debe unmount del elemento antiguo y mount de uno **nuevo**, usando
+un snapshot autorizado recién consultado. Cada nueva asociación verifica de
+nuevo identidad por API y obtiene un canal aleatorio nuevo; no hereda opciones,
+resultados ni tokens del registro anterior. attach(...,{loaded:true}) es una
+afirmación explícita del anfitrión sobre la carga inicial; no autentica documentos
+y no es una vía de reconexión para elementos retirados. mount es la vía recomendada.
+
+Respuestas HTTP tardías de registros revocados no publican INIT/snapshots/resultados
+en el documento nuevo. Una operación ya iniciada puede completar en el SDK, sin
+rollback. Al remontar, consultar snapshot antes de decidir otra acción; no existe
+replay Bridge entre canales nuevos.
+
+Esta mitigación empieza cuando el anfitrión **observa load**. No puede detectar
+por WindowProxy/origin=null el inicio o commit de una navegación, ni distinguir
+documentos que comparten esa WindowProxy. No garantiza impedir mensajes en tránsito
+o entregas anteriores a ese evento; tampoco impide por sí sola la navegación
+maliciosa. El nonce READY correlaciona una solicitud, no autentica el documento.
+Se conservan páginas web confiables/revisadas, sin secretos de servidor en INIT.
+Una garantía más fuerte de identidad de documento/origen requiere otro diseño
+y revisión; no se afirma aquí mediante origin=null, tokens ni sandbox.
 
 detach invalida protocolo sin terminar la partida. unmount además quita el
 elemento. Un MutationObserver detecta retirada externa del DOM; también se
 comprueba isConnected antes de enviar/recibir. dispose libera listeners del host.
 Cada cliente dispose libera sus propios listeners/suscriptores y rechaza pendientes.
-DETACH disposed/removed también libera esos listeners; reloaded conserva la
-escucha para resolver el handshake de carga del mismo documento si hubo una carrera.
+DETACH disposed/removed también libera esos listeners. El motivo reloaded sigue
+siendo válido en el protocolo por compatibilidad, pero el host ya no lo envía a
+una ventana navegada ni lo utiliza para abrir otro canal automáticamente.
 Desmontar uno no termina ni desconecta los otros. Un único cliente por documento;
-no se sustituye por otro cliente sobre un canal activo sin recarga/nueva asociación.
+no se sustituye por otro cliente sobre un canal activo; navegar exige montaje
+explícito de un iframe nuevo por el anfitrión.
 
 ## Dispatch, idempotencia y resincronización
 
@@ -246,9 +300,19 @@ conflictos, fallos desconocidos, snapshots, FIFO, tres canales y unsubscribe.
 Las regresiones anteriores SDK/HTTP/Outbox se ejecutan sin las suites que usan
 Prolog real. Los contadores finales se informan en la entrega.
 
-La verificación combinada pasó **192/192** pruebas, incluidas **25 nuevas** de
+La verificación anterior a esta corrección pasó **192/192** pruebas, incluidas **25 nuevas** de
 Bridge/recursos, sin fallos ni omisiones. Se verificó el enlace externo mediante
 junction en Windows. Los archivos nuevos/modificados ESM se revisan con node --check.
+
+La corrección de auditoría añade cinco regresiones: READY antiguo intercalado
+con una navegación y remonte con otra identidad; lectura inicial pendiente que
+no puede publicar INIT tras navegar; CSP de origen público HTTPS con cabeceras
+de proxy falsificadas; HTTP loopback sin confianza en esas cabeceras; socket TLS
+y configuración de origen estricta. Se actualizan las pruebas de carga inicial
+y recarga para exigir remonte explícito y no reenvío de INIT. Las cantidades
+actuales son **197/197** en la regresión combinada y **30/30** en las cuatro suites
+Bridge/recursos, sin fallos ni omisiones. Las pruebas TLS/proxy simulan conexión o
+configuración para inspeccionar CSP, no levantan un proxy ni certificados reales.
 
 ```powershell
 node --test test/sdk-web-assets.test.mjs test/sdk-bridge-protocol.test.mjs test/sdk-bridge-host.test.mjs test/sdk-bridge-client.test.mjs
@@ -282,8 +346,16 @@ Para el servidor normal, habilitar GAMECONSOLE_SDK_ENABLED=1, directorio plugins
 y trustedIds explícitos como en 3C; abrir `/sdk/bridge-demo.html`. Inspeccionar
 DevTools: sandbox exacto, módulos sin errores CSP/CORS, Origin null desde iframe,
 READY/INIT y snapshots correctos, no canales en URLs/atributos y API sin CORS.
-Probar recarga del frame desde DevTools; el canal viejo debe dejar de funcionar.
+Probar recarga o navegación del frame desde DevTools: el canal viejo debe dejar
+de funcionar, debe aparecer NAVIGATION_REQUIRES_REMOUNT en el host y READY del
+documento nuevo no debe recibir INIT. Pulsar Montar de nuevo: crea otro elemento
+y restablece solo esa asociación. Repetir detrás del proxy HTTPS objetivo con
+GAMECONSOLE_PUBLIC_ORIGIN configurado y comprobar que las fuentes usan HTTPS,
+sin mixed content ni dependencia de Forwarded/X-Forwarded-Proto.
 Repetir en los navegadores objetivo y revisar navegación/bloqueos antes de publicar.
+La comprobación de navegador descrita antes corresponde a la implementación
+previa; esta corrección se verifica con Node/ventanas simuladas. La nueva política
+de navegación y el despliegue HTTPS real quedan pendientes de esa repetición manual.
 
 Pendiente 3E.2: UI jugable, controles y ciclo visual de cada plugin. Pendiente
 3E.3: dashboard/resultados en el host. Siguen pendientes autenticación/titularidad,

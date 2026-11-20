@@ -1,6 +1,7 @@
 import { constants } from 'node:fs';
 import { open, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
+import { SDKError } from './values.mjs';
 
 const MAX = 1024 * 1024;
 const types = { '.html': 'text/html; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8',
@@ -11,10 +12,23 @@ const inside = (root, file) => { const r = path.relative(root, file); return r !
 const segment = (s) => /^[a-zA-Z0-9_-][a-zA-Z0-9._-]{0,127}$/.test(s) && !s.endsWith('.')
   && !/^(con|prn|aux|nul|com[0-9]|lpt[0-9])(?:\.|$)/i.test(s)
   && !['server', 'prolog', 'analytics', 'node_modules'].includes(s.toLowerCase());
-function origin(req) {
+const authority = /^(?:[a-zA-Z0-9.-]+|\[[a-fA-F0-9:]+\])(?::[0-9]{1,5})?$/;
+function validatePublicOrigin(value) {
+  if (value === undefined) return undefined;
+  try {
+    if (typeof value !== 'string') throw Error();
+    const url = new URL(value);
+    if (!['http:', 'https:'].includes(url.protocol) || url.origin !== value || !authority.test(url.host)
+      || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw Error();
+    return url.origin;
+  } catch { throw new SDKError('INVALID_CONFIGURATION', 'GAMECONSOLE_PUBLIC_ORIGIN debe ser un origen HTTP(S) canónico, sin ruta, credenciales ni query.'); }
+}
+function origin(req, configured) {
+  if (configured) return configured;
   const value = req.headers.host;
-  if (typeof value !== 'string' || !/^(?:[a-zA-Z0-9.-]+|\[[a-fA-F0-9:]+\])(?::[0-9]{1,5})?$/.test(value)) throw Error();
-  const url = new URL(`http://${value}`);
+  if (typeof value !== 'string' || !authority.test(value)) throw Error();
+  // Only the actual connection controls the scheme. Forwarded headers are untrusted.
+  const url = new URL(`${req.socket?.encrypted ? 'https' : 'http'}://${value}`);
   if (url.host !== value || url.pathname !== '/' || url.username || url.password) throw Error();
   return url.origin;
 }
@@ -22,7 +36,8 @@ export function pluginCSP(base, gameId) {
   return `default-src 'none'; script-src ${base}/sdk/web/${gameId}/ ${base}/sdk/bridge/; style-src ${base}/sdk/web/${gameId}/; img-src ${base}/sdk/web/${gameId}/ data:; font-src ${base}/sdk/web/${gameId}/; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'self'`;
 }
 /** Metadata-only static reads. No loader, import(), or plugin execution occurs here. */
-export function createWebAssets(runtime, { bridgeDirectory }) {
+export function createWebAssets(runtime, { bridgeDirectory, publicOrigin }) {
+  const configuredOrigin = validatePublicOrigin(publicOrigin);
   return async (req, res) => {
     let status = 404, handle;
     try {
@@ -70,7 +85,7 @@ export function createWebAssets(runtime, { bridgeDirectory }) {
       res.setHeader('X-Content-Type-Options', 'nosniff');
       res.setHeader('Access-Control-Allow-Origin', '*'); // Public static resources only; never credentials or API.
       res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-      if (gameId) res.setHeader('Content-Security-Policy', pluginCSP(origin(req), gameId));
+      if (gameId) res.setHeader('Content-Security-Policy', pluginCSP(origin(req, configuredOrigin), gameId));
       res.writeHead(200, { 'Content-Type': type, 'Content-Length': content?.length ?? info.size, 'Cache-Control': 'no-store' });
       res.end(content);
     } catch {

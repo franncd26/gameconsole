@@ -6,8 +6,9 @@ import os from 'node:os';
 import path from 'node:path';
 import { prepareSDK } from '../server/sdk/bootstrap.mjs';
 import { createApp } from '../server/index.mjs';
+import { createWebAssets } from '../server/sdk/web-assets.mjs';
 
-async function setup(t, enabled = true) {
+async function setup(t, enabled = true, publicOrigin) {
   const root = await mkdtemp(path.join(os.tmpdir(), 'sdk-web-'));
   t.after(() => rm(root, { recursive: true, force: true }));
   const dir = path.join(root, 'snake');
@@ -19,7 +20,7 @@ async function setup(t, enabled = true) {
   await writeFile(path.join(dir, 'web/local.mjs'), "export const value = 1;\n");
   await writeFile(path.join(dir, 'web/local.css'), 'body { color: navy; }\n');
   const sdk = enabled ? await prepareSDK({ pluginsDirectory: root, trustedIds: ['snake'] }) : undefined;
-  const app = createApp({ sdk, statsURL: 'http://go.test', statsFetcher: async () => new Response('{}') });
+  const app = createApp({ sdk, publicOrigin, statsURL: 'http://go.test', statsFetcher: async () => new Response('{}') });
   await new Promise((resolve) => app.server.listen(0, '127.0.0.1', resolve));
   t.after(async () => { app.outbox.stop(); app.server.closeAllConnections(); await new Promise((r) => app.server.close(r)); });
   const port = app.server.address().port;
@@ -70,4 +71,41 @@ test('external symlink/junction assets cannot escape web tree; static requests d
   try { await symlink(path.join(h.dir, 'server'), path.join(h.dir, 'web/linked'), process.platform === 'win32' ? 'junction' : 'dir'); }
   catch (error) { if (['EPERM', 'EACCES', 'ENOTSUP'].includes(error.code)) { t.skip('No se permiten symlinks en este entorno'); return; } throw error; }
   assert.equal((await h.request('/sdk/web/snake/linked/snake-session.mjs')).status, 404);
+});
+
+test('configured HTTPS public origin controls CSP behind a proxy; spoofed forwarding and Host never downgrade it', async (t) => {
+  const h = await setup(t, true, 'https://console.example:8443');
+  const r = await h.request('/sdk/web/snake/', 'GET', { Host: 'backend.internal',
+    Forwarded: 'host=attacker.example;proto=http', 'X-Forwarded-Proto': 'http', 'X-Forwarded-Host': 'attacker.example' });
+  assert.equal(r.status, 200);
+  const csp = r.headers['content-security-policy'];
+  assert.ok(csp.includes('https://console.example:8443/sdk/web/snake/'));
+  assert.ok(csp.includes('https://console.example:8443/sdk/bridge/'));
+  assert.ok(!csp.includes('http://') && !csp.includes('attacker') && !csp.includes('backend.internal'));
+});
+
+test('loopback HTTP remains compatible and ignores Forwarded / X-Forwarded-Proto without public-origin configuration', async (t) => {
+  const h = await setup(t);
+  const r = await h.request('/sdk/web/snake/', 'GET', { Forwarded: 'proto=https;host=attacker.example', 'X-Forwarded-Proto': 'https' });
+  assert.equal(r.status, 200);
+  assert.match(r.headers['content-security-policy'], /http:\/\/127\.0\.0\.1:\d+\/sdk\/bridge\//);
+  assert.ok(!r.headers['content-security-policy'].includes('https://') && !r.headers['content-security-policy'].includes('attacker'));
+});
+
+test('direct TLS socket derives HTTPS without proxy headers and invalid public-origin configuration fails at construction', async (t) => {
+  const h = await setup(t), headers = {};
+  let status;
+  const handler = createWebAssets(h.app.sdk, { bridgeDirectory: path.resolve('public/sdk/bridge') });
+  await handler({ url: '/sdk/web/snake/', method: 'HEAD', headers: { host: 'tls.example' }, socket: { encrypted: true } }, {
+    setHeader(key, value) { headers[key] = value; }, writeHead(code) { status = code; }, end() {},
+  });
+  assert.equal(status, 200); assert.ok(headers['Content-Security-Policy'].includes('https://tls.example/sdk/bridge/'));
+  for (const value of ['', 'https://console.example/', 'https://console.example/path', 'https://user:secret@console.example',
+    'https://console.example?q=1', 'https://console.example#fragment', 'https://console.example:443', ' https://console.example',
+    'https://console.example;script-src', 'ftp://console.example', '//console.example', 42, {}]) {
+    assert.throws(() => createWebAssets(undefined, { bridgeDirectory: '.', publicOrigin: value }), { code: 'INVALID_CONFIGURATION' });
+  }
+  for (const value of ['http://127.0.0.1:3000', 'http://localhost', 'https://console.example', 'https://[::1]:8443']) {
+    assert.equal(typeof createWebAssets(undefined, { bridgeDirectory: '.', publicOrigin: value }), 'function');
+  }
 });
