@@ -1,0 +1,6 @@
+{
+  "profileSchemaVersion":1,"profileVersion":"1.0.0","gameId":"import-demo","playersField":"/data/players",
+  "capabilities":[{"templateId":"event-metrics/v1","instanceId":"counter","availability":"live",
+    "metrics":[{"id":"increments.match","label":"Incrementos confirmados","eventType":"COUNTER_INCREMENTED","operation":"count","scope":"match","unit":"events"}]}],
+  "specializedAnalyzers":[]
+}

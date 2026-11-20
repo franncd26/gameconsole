@@ -1,28 +1,43 @@
-# Evidencia de verificación
+# Comprobaciones técnicas de GameConsole
 
-Revisión realizada el 18 de noviembre de 2026, hora de Costa Rica.
+La validación del proyecto combina pruebas automatizadas, una integración real y pruebas manuales de la interfaz.
 
-- 12 pruebas Node.js: reglas de los tres juegos, configuración, aislamiento, fallos
-  de Prolog, API HTTP, reintentos y reconocimiento de duplicados.
-- 10 pruebas Prolog, incluida exploración de todas las continuaciones
-  legales del jugador para verificar que la estrategia de O no pierde.
-- Suite Go y go vet aprobados. Detector de carreras aprobado en Linux Docker.
-- 146 pruebas Scala aprobadas, incluyendo resumen vacío, partidas abiertas y
-  cerradas, estabilidad de consultas y rechazo de duplicación de partidas.
-- Integración real de seis partidas simultáneas completada con Node, SWI-Prolog,
-  Go y Scala: todos los eventos entregados, resultados válidos y conteos correctos.
-- Interrupción mediante pausa temporal del contenedor Go: juego activo, eventos
-  pendientes conservados y entrega recuperada al reanudarlo.
-- Instalación ejecutada desde la carpeta definitiva de Proyecto 2: descarga del
-  commit fijado y construcción mediante una copia temporal sin tildes.
-- Interfaz inspeccionada en navegador: biblioteca, Gato contra Prolog y panel
-  de estadísticas con valores reales. Comprobaciones de diseño adaptativo.
+## Automatización
 
-La primera CI de GameConsole aprobó en GitHub. La ampliación de GameStats
-aprobó sus seis trabajos tras añadir reintentos a una descarga intermitente del
-lanzador sbt, manteniendo su checksum. Las ejecuciones posteriores se consultan
-en las pestañas Actions de ambos repositorios.
+La [ejecución aprobada de GitHub Actions](https://github.com/JusMH/gameconsole/actions/runs/44814482222) incluye:
 
-Los informes de integración y recuperación se generan en `evidence/` y se
-adjuntan como artefactos de CI. Los datos de demostración no son persistentes.
-El video final y la entrega en Tec Digital requieren revisión humana.
+- **342 pruebas Node aprobadas**, sin errores ni cancelaciones.
+- Pruebas de SWI-Prolog con las estrategias del juego Gato.
+- Construcción de los servicios Node, Go y Scala mediante Docker.
+- Verificación de creación de partidas, eventos entregados, métricas y dashboard mediante el ejecutor integrado.
+- Publicación del [artefacto de integración](https://github.com/JusMH/gameconsole/actions/runs/44814482222/artifacts/14669531219).
+
+## Prueba local
+
+Con Docker instalado:
+
+```powershell
+node scripts/deploy.mjs
+docker compose -p gameconsole ps
+```
+
+Para ejecutar pruebas desde el repositorio:
+
+```powershell
+npm run check
+npm test
+```
+
+Con el sistema desplegado, sin otras partidas activas:
+
+```powershell
+npm run test:integration:sdk
+```
+
+La última orden genera `evidence/sdk-integration.json` y comprueba el recorrido entre GameConsole, Prolog, Go y Scala. Para detener el entorno: `node scripts/deploy.mjs --stop`.
+
+## Comprobación visual
+
+La demostración debe verificar los controles de Gato, Snake y Circuito; la ejecución de varias partidas simultáneas; los datos por juego; las estadísticas generales de GameStats y el historial de partidas.
+
+Las partidas y los eventos pendientes se conservan solo mientras permanecen activos los procesos correspondientes.

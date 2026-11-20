@@ -1,0 +1,14 @@
+{
+  "manifestVersion": 1,
+  "sdkVersion": "1.0",
+  "id": "snake",
+  "name": "Snake",
+  "version": "1.1.0",
+  "description": "Snake de cuadrícula con crecimiento y colisiones",
+  "category": "arcade",
+  "entrypoints": { "server": "server/index.mjs", "web": "web/index.html" },
+  "capabilities": { "pause": false, "resume": false, "multipleInstances": true, "ai": false },
+  "players": { "min": 1, "max": 1 },
+  "analytics": { "profile": "analytics/profile.json" },
+  "options": [{ "id": "size", "label": "Tamaño", "type": "integer", "values": [12, 20, 28], "default": 20 }]
+}

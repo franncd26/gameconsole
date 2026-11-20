@@ -1,49 +1,70 @@
-# Contrato de integración
+# Integración con GameStats
 
-La fuente del contrato v1 es GameStats. No se cambian sus campos obligatorios:
-`schemaVersion: 1`, `eventId`, `timestamp`, `gameId`, `matchId`, `type`, `data`.
-Se incluyen `gameVersion` y, para acciones de jugador, `playerId`.
-`timestamp` usa ISO/RFC3339 UTC y `data` siempre es un objeto JSON.
+GameConsole utiliza GameStats como sistema externo de recepción y análisis de eventos. Las reglas de juego permanecen en Node.js; **Go recibe los eventos y Scala calcula las estadísticas**.
 
-| Juego | Eventos y datos |
+## Identificación y envío de eventos
+
+Cada partida dispone de un `matchId` UUID. Los eventos incluyen los campos requeridos por el contrato v1 de GameStats:
+
+| Campo | Significado |
 | --- | --- |
-| Todos | MATCH_STARTED con players; MATCH_FINISHED con reason. |
-| Gato | Inicio con human/X y prolog/O; MOVE_PLACED con turn, row, column y symbol; AI_DECISION con algoritmo, índice, evaluación y tablero. |
-| Snake | APPLE_EATEN con incremento points=10; PLAYER_DIED con cause. |
-| Circuito | LAP_COMPLETED con lap y durationMs; OBSTACLE_HIT con lap y lane. |
+| `schemaVersion` | Versión del contrato de eventos; valor `1`. |
+| `eventId` | Identificador único del evento. |
+| `timestamp` | Fecha y hora UTC en formato compatible con RFC 3339. |
+| `gameId` | Videojuego al que corresponde el evento. |
+| `matchId` | Instancia de partida que lo generó. |
+| `type` | Tipo de acontecimiento registrado. |
+| `data` | Objeto JSON con la información del evento. |
 
-No se envía la puntuación acumulada como incremento. Los eventos adicionales
-AI_DECISION y OBSTACLE_HIT son compatibles con el sobre y no alteran los perfiles.
+`gameVersion` y `playerId` se incorporan cuando corresponda. `MATCH_STARTED` y `MATCH_FINISHED` permiten registrar las instancias iniciadas y finalizadas.
 
-## API de GameConsole
+Los eventos de dominio utilizados por los tres juegos incluyen:
 
-| Método y ruta | Responsabilidad |
+| Juego | Eventos principales |
 | --- | --- |
-| GET /api/catalog | Los tres juegos disponibles. |
-| GET /api/health | Salud de Node, sin prometer salud de dependencias. |
-| POST /api/matches | Crear partida con gameId; responde 201 y snapshot. |
-| GET /api/matches | Listar partidas locales y estado de envío. |
-| GET /api/matches/{id} | Snapshot y entregas de una partida. |
-| POST /api/matches/{id}/action | Ejecutar una acción legal. |
-| POST /api/matches/{id}/finish | Cierre por abandono, repetible sin duplicar cierre. |
-| GET /api/matches/{id}/results | Consultar resultados reales de GameStats. |
-| GET /api/dashboard | Consultar resumen real de GameStats. |
+| **Gato** | `MOVE_PLACED` y `AI_DECISION`. |
+| **Snake** | `APPLE_EATEN` y `PLAYER_DIED`. |
+| **Circuito** | `LAP_COMPLETED` y `OBSTACLE_HIT`. |
 
-Al crear partida, options admite `{difficulty:"easy|medium|hard"}` para Gato
-y `{size:12|20|28}` para Snake. Omitir opciones conserva alta y 20×20.
-Valores no admitidos producen 400 sin registrar instancia. Los valores elegidos
-se incluyen en snapshot y data de inicio como difficulty/gridSize.
+`GameEventAdapter` construye y valida los eventos. `EventOutbox` los envía en orden por partida a la API de Go, con reintentos ante fallos temporales. Un fallo de comunicación no debe bloquear las acciones de otras partidas; los eventos todavía no entregados permanecen en memoria.
 
-Acciones: Gato `{index:0..8}` o `{retryAI:true}`; Snake
-`{direction:"up|down|left|right"}`; Circuito `{lane:0..2,accelerate:true,brake:false}`.
-Solicitudes inválidas: 400; inexistentes: 404; partida cerrada/turno pendiente:409;
-capacidad:429; dependencia no disponible:502/503. Un fallo de Prolog responde500
-y permite recuperar el snapshot para reintentar la IA.
+## Contrato de la consola web
 
-## Extensión de GameStats
+La interfaz utiliza el Bridge del SDK para solicitar acciones. La API genérica expone:
 
-Go agrega GET /dashboard y Scala POST /analyze-summary. La respuesta contiene
-`source:"GameStats / Scala"`, `scope:"current_process"`, `totals`, `games` y
-`matches`. Los conteos son started/active/finished/events. Cada juego incluye
-métricas aditivas, sus unidades y `invalidSamples` para advertir datos parciales.
-GET /results conserva su formato y sus estados provisional/final/unavailable/invalid.
+| Método y ruta | Uso |
+| --- | --- |
+| `GET /api/sdk/catalog` | Consultar los tres videojuegos habilitados. |
+| `POST /api/sdk/matches` | Crear una partida con `gameId` y opciones. |
+| `GET /api/sdk/matches` | Consultar las partidas del proceso. |
+| `GET /api/sdk/matches/{id}` | Obtener el estado confirmado de una partida. |
+| `POST /api/sdk/matches/{id}/actions` | Ejecutar una acción del juego. |
+| `POST /api/sdk/matches/{id}/finish` | Finalizar administrativamente una partida. |
+| `GET /api/sdk/matches/{id}/results` | Obtener el análisis de esa partida desde GameStats. |
+| `GET /api/dashboard` | Obtener las estadísticas generales desde GameStats. |
+
+Las acciones incorporan `requestId`, `type`, `payload` y, opcionalmente, `expectedVersion` para controlar versiones y solicitudes repetidas. Cada plugin define sus propias acciones: `PLACE_MARK` y `RETRY_AI` en Gato, `TICK` en Snake y `STEP` en Circuito.
+
+## Actualización de estadísticas
+
+La información se obtiene desde GameStats en tres niveles:
+
+1. **Confirmación local:** GameConsole acepta una transición y sus eventos en memoria.
+2. **Entrega:** el Outbox confirma que Go recibió los eventos.
+3. **Análisis:** Scala calcula las métricas a partir de los eventos de la partida.
+
+Una confirmación local no equivale a una entrega o a un análisis terminado.
+
+El panel de la partida seleccionada consulta los resultados periódicamente (aproximadamente cada 3 segundos); las estadísticas generales se actualizan aproximadamente cada 5 segundos. Las tarjetas de la cuadrícula también presentan resultados individuales cuando están visibles.
+
+Las métricas pueden aparecer como **provisionales**, **finales** o **no disponibles**, según el estado de la partida y el perfil de GameStats. La consola conserva esa distinción y no convierte un valor inexistente en cero.
+
+Go ofrece las consultas de eventos y resultados; Scala interpreta los perfiles analíticos de Gato, Snake y Circuito. GameConsole no calcula por su cuenta puntuaciones agregadas, promedios ni patrones que correspondan a GameStats.
+
+## Manejo de errores y límites
+
+Los envíos se reintentan sin bloquear otras partidas. Los datos de juego y el Outbox son volátiles; un reinicio puede perder información pendiente. No se garantiza entrega exactamente una vez ante todas las fallas posibles.
+
+El cierre administrativo de una partida no equivale a una victoria. Si Prolog falla después de aceptar el movimiento humano, la jugada se conserva y el oponente puede reintentarse.
+
+La arquitectura general se describe en [arquitectura](arquitectura.md); la instalación y ejecución se explican en el [README](../README.md).

@@ -5,6 +5,7 @@ COPY --chown=node:node package.json ./
 COPY --chown=node:node server ./server
 COPY --chown=node:node public ./public
 COPY --chown=node:node prolog ./prolog
+COPY --chown=node:node plugins ./plugins
 USER node
 ENV HOST=0.0.0.0 PORT=3000 NODE_ENV=production
 EXPOSE 3000

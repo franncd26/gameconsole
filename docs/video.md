@@ -1,25 +1,28 @@
-# Guion de demostración
+# Guion de demostración — GameConsole
 
-Duración sugerida: 8 a 12 minutos. Grabar la versión verificada después de
-revisarla con los dos integrantes. El video final debe publicarse con un enlace
-de acceso público y adjuntarse a Tec Digital.
+**Duración objetivo: 12 a 13 minutos. Límite: 15 minutos.**
 
-1. **Presentación, 1 min:** autores, objetivo y los dos repositorios. Explicar
-   que GameConsole produce eventos y GameStats los analiza con Go/Scala.
-2. **Ejecución, 1 min:** mostrar Docker Compose, tres servicios saludables y la
-   dirección local. Explicar el despliegue reproducible y el pipeline de GitHub.
-3. **Gato y Prolog, 2 min:** jugar, mostrar la jugada de la computadora y su
-   evaluación. Explicar generación de estados, reglas terminales y minimax.
-   Mostrar las clases de dominio y las reglas Prolog relevantes.
-4. **Snake, 1 min:** mover, comer una manzana, comprobar los puntos y finalizar
-   por colisión. Mostrar incremento y evento de muerte.
-5. **Circuito, 1 min:** acelerar, cambiar carril, evitar/chocar obstáculos y
-   completar vueltas. Mostrar sus tiempos en GameStats.
-6. **Concurrencia, 2 min:** abrir partidas en pestañas diferentes, identificar
-   sus IDs y consultar el panel mientras alguna sigue abierta. Mostrar que los
-   resultados pertenecen a la partida correcta y los contadores se actualizan.
-7. **Calidad, 1 min:** mostrar pruebas aprobadas, documentación y manejo visible
-   de errores. Explicar que los datos están en memoria y el panel no recalcula.
+La demostración debe realizarse con el deployment académico de **Gato, Snake y Circuito**, utilizando Go, Scala y Prolog reales.
 
-Cerrar con los resultados de la ejecución integrada. Evitar exponer pestañas,
-notificaciones o información personal ajena al proyecto durante la grabación.
+| Tiempo aproximado | Demostración |
+| --- | --- |
+| **0:00–1:00** | Presentar GameConsole, las tecnologías y los tres servicios Docker saludables. Abrir la biblioteca. |
+| **1:00–3:00** | Jugar Gato contra la computadora; explicar cómo el tablero llega a SWI-Prolog y cómo se ejecuta su decisión. |
+| **3:00–4:30** | Jugar Snake, moverse, comer una manzana y observar los eventos y estadísticas. |
+| **4:30–6:00** | Jugar Circuito: carriles, aceleración, obstáculos y registro de vueltas. |
+| **6:00–8:00** | Mantener varias partidas abiertas; mostrar instancias distintas del mismo juego, la cuadrícula y otra pestaña que comparte una partida por ID. |
+| **8:00–9:45** | Mostrar las estadísticas de cada partida mientras continúa y el dashboard general; explicar los conteos de instancias y la separación Go/Scala. |
+| **9:45–11:15** | Explicar la arquitectura orientada a objetos, el SDK, las responsabilidades de las clases y los patrones Factory, Adapter y Observer. |
+| **11:15–12:30** | Mostrar el deployment Docker y la [ejecución aprobada de CI/CD](https://github.com/JusMH/gameconsole/actions/runs/44814482222), incluyendo su integración real. |
+| **12:30–13:00** | Resumir las limitaciones y concluir. |
+
+## Preparación de la grabación
+
+- Comprobar previamente los controles, audio y visualización de las tres interfaces.
+- Preparar una partida que permita demostrar el progreso de Circuito sin simular resultados ni modificar las reglas.
+- Mostrar métricas reales; las cifras provisionales y finales deben distinguirse de las no disponibles.
+- Demostrar la concurrencia sin confundir una nueva vista de la misma partida con una instancia nueva.
+- No mostrar credenciales, notificaciones privadas ni información personal innecesaria.
+- Publicar el video con acceso verificable y colocar su enlace en [verificación y entrega](entrega.md).
+
+El importador experimental puede mencionarse brevemente como extensión adicional, pero **no reemplaza la demostración de ninguno de los tres juegos obligatorios**.

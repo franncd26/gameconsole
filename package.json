@@ -11,6 +11,7 @@
     "start": "node server/index.mjs",
     "test": "node --test test/*.test.mjs",
     "test:integration": "node scripts/integration.mjs",
-    "check": "node --check server/index.mjs && node --check public/app.mjs"
+    "test:integration:sdk": "node scripts/sdk-compose-integration.mjs",
+    "check": "node scripts/check.mjs"
   }
 }
