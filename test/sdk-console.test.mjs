@@ -87,6 +87,99 @@ test('a busy Bridge read cannot permanently hide a confirmed finish: next list u
   const finished=snapshot('a','alpha',1,'finished');h.app.accept(finished);await settle();assert.equal(record.needsRefresh,true);
   h.app.accept(finished);await settle();assert.equal(attempts,2);assert.equal(record.needsRefresh,false);assert.equal(record.frame,frame);assert.equal(h.bridge.unmounts.length,0);
 });
+test('closing to finished during a pending Bridge read preserves the newer refresh revision on the same iframe', async t => {
+  const h = fixture(t, { matches: [snapshot('a')] }); await h.app.init(); await h.app.select('a');
+  const record = h.app.workspace.records.get('a'), frame = record.frame, gates = [deferred(), deferred()];
+  const published = []; let calls = 0, inFlight = 0, maximum = 0;
+  h.bridge.refresh = async target => {
+    assert.equal(target, frame); const index = calls++, observed = structuredClone(h.stored.get('a'));
+    maximum = Math.max(maximum, ++inFlight);
+    await gates[index].promise; inFlight--; published.push(observed); return true;
+  };
+  const closing = snapshot('a', 'alpha', 0, 'closing'); h.stored.set('a', closing); h.app.accept(closing);
+  assert.equal(calls, 1);
+  const finished = snapshot('a', 'alpha', 1, 'finished'); h.stored.set('a', finished); h.app.accept(finished);
+  assert.equal(calls, 1, 'finished cannot overlap the closing read');
+  gates[0].resolve(); await settle();
+  assert.equal(calls, 2, 'a successful older read must trigger a new read of the current snapshot');
+  assert.equal(record.needsRefresh, true);
+  gates[1].resolve(); await settle();
+  assert.deepEqual(published.map(s => s.state), ['closing', 'finished']);
+  assert.ok(published.every(s => s.matchId === 'a' && s.gameId === 'alpha'));
+  assert.equal(maximum, 1); assert.equal(record.needsRefresh, false);
+  assert.equal(record.frame, frame); assert.equal(h.bridge.unmounts.length, 0);
+});
+test('reconcile removes disappeared session controls and iframe without finishing it or disturbing another session', async t => {
+  const h = fixture(t, { matches: [snapshot('a'), snapshot('b', 'beta')], catalog: [plugin(), plugin('beta')] });
+  await h.app.init(); await h.app.select('a'); await h.app.select('b'); await h.app.select('a');
+  const missing = h.app.workspace.records.get('a'), missingFrame = missing.frame, survivor = h.app.workspace.records.get('b'), frame = survivor.frame;
+  h.stored.delete('a'); h.app.reconcile([...h.stored.values()]); await settle();
+  assert.equal(h.app.workspace.records.has('a'), false); assert.equal(missing.card.parentNode, null);
+  assert.equal(h.app.rows.has('a'), false); assert.equal(h.app.snapshots.has('a'), false);
+  assert.deepEqual(h.bridge.unmounts, [missingFrame]);
+  await h.app.finish('a'); missing.finish.fire('click'); await settle();
+  assert.equal(h.calls.finishes, 0, 'even a stale callback cannot finalize an ID removed by reconciliation');
+  assert.equal(h.app.library.cards.get('alpha').existing, null);
+  assert.equal(h.app.workspace.records.get('b'), survivor); assert.equal(survivor.frame, frame);
+});
+test('persistent false/rejected refresh keeps pending work but never retries without a later update', async t => {
+  for (const rejects of [false, true]) {
+    const h = fixture(t, { matches: [snapshot('a')] }); await h.app.init(); await h.app.select('a');
+    const record = h.app.workspace.records.get('a'), gate = deferred(); let calls = 0;
+    h.bridge.refresh = async () => { if (++calls === 1) await gate.promise; if (rejects) throw Error('/private/transport'); return false; };
+    h.app.accept(snapshot('a', 'alpha', 0, 'closing')); h.app.accept(snapshot('a', 'alpha', 1, 'finished'));
+    gate.resolve(); await settle();
+    assert.equal(calls, 1); assert.equal(record.needsRefresh, true); assert.equal(record.refreshing, false);
+    assert.ok(!record.channel.textContent.includes('/private'));
+    await settle(); assert.equal(calls, 1, 'failure cannot trigger an immediate retry loop');
+    h.app.accept(snapshot('a', 'alpha', 1, 'finished')); await settle();
+    assert.equal(calls, 2); assert.equal(record.needsRefresh, true); assert.equal(record.refreshing, false);
+  }
+});
+test('unmount invalidates old refresh success/failure without releasing the new iframe read guard', async t => {
+  for (const rejects of [false, true]) {
+    const h = fixture(t, { matches: [snapshot('a')] }); await h.app.init(); await h.app.select('a');
+    const record = h.app.workspace.records.get('a'), oldFrame = record.frame, gates = [deferred(), deferred()], frames = [];
+    h.bridge.refresh = async frame => {
+      const index = frames.length; frames.push(frame); await gates[index].promise;
+      if (index === 0 && rejects) throw Error('old private failure'); return true;
+    };
+    const closing = snapshot('a', 'alpha', 0, 'closing'); h.app.accept(closing);
+    h.app.workspace.unmount('a'); h.app.workspace.open(closing, 'Nombre alpha'); const freshFrame = record.frame;
+    h.app.accept(snapshot('a', 'alpha', 1, 'finished'));
+    assert.notEqual(freshFrame, oldFrame); assert.deepEqual(frames, [oldFrame, freshFrame]);
+    gates[0].resolve(); await settle();
+    assert.equal(record.refreshing, true, 'late old finally must not release the fresh generation guard');
+    assert.equal(record.needsRefresh, true);
+    h.app.accept(snapshot('a', 'alpha', 1, 'finished')); assert.equal(frames.length, 2);
+    gates[1].resolve(); await settle(); assert.equal(record.refreshing, false); assert.equal(record.needsRefresh, false);
+    assert.equal(record.frame, freshFrame);
+  }
+});
+test('workspace rejects a different game identity for an already mounted match', async t => {
+  const h = fixture(t, { matches: [snapshot('a')] }); await h.app.init(); await h.app.select('a');
+  const record = h.app.workspace.records.get('a'), frame = record.frame;
+  h.app.workspace.upsert(snapshot('a', 'foreign-plugin', 99, 'finished'), 'Foreign'); await settle();
+  assert.equal(record.snapshot.gameId, 'alpha'); assert.equal(record.snapshot.state, 'running');
+  assert.equal(record.frame, frame); assert.equal(h.bridge.refreshes.length, 0);
+});
+test('disappeared selected session cancels result polling and invalidates a delayed selection response', async t => {
+  const h = fixture(t, { matches: [snapshot('a')] }); await h.app.init(); await h.app.select('a');
+  const gate = deferred(); h.api.snapshot = () => gate.promise;
+  const selection = h.app.select('a'); h.stored.clear(); h.app.reconcile([]);
+  assert.equal(h.app.selectedId, null); assert.equal(h.app.results.key, null);
+  assert.equal(h.window.lastURL, '/'); assert.match(h.document.getElementById('selected-title').textContent, /no disponible/);
+  gate.resolve(snapshot('a')); await selection;
+  assert.equal(h.app.workspace.records.size, 0); assert.equal(h.app.rows.size, 0); assert.equal(h.bridge.mounts.length, 1);
+});
+test('a finish response arriving after the session disappears cannot resurrect its controls or restart results', async t => {
+  const h = fixture(t, { matches: [snapshot('a')] }); await h.app.init(); await h.app.select('a');
+  const gate = deferred(); h.api.finish = async () => { h.calls.finishes++; return gate.promise; };
+  const closing = h.app.finish('a'); h.stored.clear(); h.app.reconcile([]);
+  gate.resolve(snapshot('a', 'alpha', 1, 'finished')); await closing;
+  await h.app.finish('a'); assert.equal(h.calls.finishes, 1, 'only the request started before disappearance was sent');
+  assert.equal(h.app.snapshots.size, 0); assert.equal(h.app.workspace.records.size, 0); assert.equal(h.app.results.key, null);
+});
 test('lost finish response reads confirmed closing, permits explicit retry and never retries automatically', async t => {
   const h = fixture(t, { matches: [snapshot('a')] }); await h.app.init(); await h.app.select('a');
   h.api.finish = async id => { h.calls.finishes++; if (h.calls.finishes === 1) { h.stored.set(id, snapshot(id, 'alpha', 0, 'closing')); throw new ConsoleError(0); } const s = snapshot(id, 'alpha', 1, 'finished'); h.stored.set(id,s); return s; };

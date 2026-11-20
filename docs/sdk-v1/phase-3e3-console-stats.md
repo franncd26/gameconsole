@@ -84,7 +84,11 @@ Las copias de snapshots son exclusivamente de presentación. Se descartan
 versiones menores y regresiones de lifecycle en la misma versión. La respuesta
 de una selección anterior no puede abrir otra identidad encima de la más reciente.
 Si el listado deja de contener un ID tras un reinicio, su vista se desmonta y se
-marca como no disponible; no se promete persistencia del servidor.
+retiran su tarjeta y controles. Si estaba seleccionado, se invalidan las lecturas
+pendientes y las consultas de resultados; se puede seleccionar otra partida
+disponible. Un callback antiguo no puede finalizar un ID retirado ni una respuesta
+de cierre tardía recrear sus controles. No se promete persistencia del servidor;
+una operación ya enviada antes de la desaparición puede completarse en el servidor.
 
 ## Cierre administrativo
 
@@ -108,6 +112,22 @@ refresco queda pendiente, la vista conserva una marca y lo reintenta al actualiz
 el listado (5 s o botón manual), sin solapar refrescos por iframe. Al inicializar
 un canal también puede recuperar ese refresco pendiente. Se usa ante un cambio
 de lifecycle o un refresco pendiente; no se consulta cada iframe en cada polling.
+
+Cada cambio de lifecycle incrementa una revisión pendiente. Una lectura exitosa
+solo reconoce la revisión con la que empezó: si pasó closing → finished durante
+esa espera, se vuelve a leer después de concluir la primera, sobre el mismo iframe
+y sin solapamiento. Un false/rechazo conserva la marca pero espera al siguiente
+polling/refresco manual, sin reintentos inmediatos en bucle. El desmontaje invalida
+la generación del iframe: las respuestas y finally antiguos no cambian las marcas
+ni liberan la guardia de un montaje nuevo. Se rechaza un gameId distinto para un
+match ya asociado; HostBridge conserva sus verificaciones de identidad al publicar.
+
+Corrección de auditoría sobre `85d29f432019627306f0093899b990331986484a`:
+las dos reproducciones iniciales fallaron antes del arreglo. Se añadieron siete
+pruebas de regresión con promesas controladas; la suite de consola tiene ahora
+20 pruebas. La verificación focalizada consola/Bridge/web/HTTP/Outbox aprobó
+103 pruebas sin fallos ni skips, más sintaxis de tres archivos y git diff --check.
+No se ejecutaron navegadores ni servicios externos para esta corrección.
 
 ## Procedencia de las estadísticas
 

@@ -86,9 +86,12 @@ export class ConsoleApp {
     if (this.disposed) return;
     const available = new Set(snapshots.map(s => s.matchId));
     for (const id of this.snapshots.keys()) if (!available.has(id)) {
-      this.snapshots.delete(id); this.rows.get(id)?.node.remove(); this.rows.delete(id); this.workspace.unmount(id);
-      const record = this.workspace.records.get(id);
-      if (record) { record.channel.textContent = 'Partida ya no disponible en este proceso.'; record.finish.disabled = true; }
+      this.snapshots.delete(id); this.rows.get(id)?.node.remove(); this.rows.delete(id); this.workspace.remove(id);
+      if (this.selectedId === id) {
+        this.selection++; this.selectedId = null; void this.results.setKey(null);
+        this.document.getElementById('selected-title').textContent = 'Partida ya no disponible en este proceso.';
+        this.window.history?.replaceState(null, '', this.window.location.pathname);
+      }
     }
     for (const snapshot of snapshots) this.accept(snapshot);
     this.library.setMatches([...this.snapshots.values()]);
@@ -126,22 +129,24 @@ export class ConsoleApp {
     } catch (error) { if (generation === this.selection) this.error(error); }
   }
   async finish(id) {
-    if (!id || this.disposed || this.finishing.has(id)) return;
+    if (!id || this.disposed || this.finishing.has(id) || !this.snapshots.has(id)) return;
+    const available = () => !this.disposed && this.snapshots.has(id);
     this.finishing.add(id); this.workspace.setFinishing(id, true); this.library.setFinishing(id, true);
-    try { this.accept(await this.api.finish(id)); }
+    try { const snapshot = await this.api.finish(id); if (available()) this.accept(snapshot); }
     catch (error) {
+      if (!available()) return;
       this.error(error);
       if (error.snapshot) this.accept(error.snapshot);
       // A failed HTTP response does not establish whether MATCH_FINISHED was accepted.
       try {
-        const current = await this.api.snapshot(id); this.accept(current);
+        const current = await this.api.snapshot(id); if (!available()) return; this.accept(current);
         if (!this.disposed) this.notice.textContent = current.state === 'finished'
           ? 'La respuesta de cierre falló; el snapshot confirma finished. No se repetirá el cierre automáticamente.'
           : current.state === 'closing' ? 'Cierre pendiente de aceptación. Puedes reintentar el cierre explícitamente.'
           : 'El snapshot continúa running. Puedes reintentar el cierre explícitamente.';
-      } catch { if (!this.disposed) this.notice.textContent = 'Resultado del cierre desconocido. Consulta el estado antes de reintentar; no se presume rollback.'; }
+      } catch { if (available()) this.notice.textContent = 'Resultado del cierre desconocido. Consulta el estado antes de reintentar; no se presume rollback.'; }
     } finally {
-      this.finishing.delete(id); if (!this.disposed) {
+      this.finishing.delete(id); if (available()) {
         this.workspace.setFinishing(id, false); this.library.setFinishing(id, false);
         if (this.selectedId === id) void this.results.setKey(id);
         void this.dashboard.setKey('dashboard'); void this.sessions.refresh();

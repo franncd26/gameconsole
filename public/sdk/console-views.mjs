@@ -77,7 +77,7 @@ export class MatchWorkspace {
   }
   upsert(snapshot, name) {
     const record = this.records.get(snapshot.matchId); if (!record) return;
-    if (snapshot.version < record.snapshot.version) return;
+    if (snapshot.gameId !== record.snapshot.gameId || snapshot.version < record.snapshot.version) return;
     const changed = record.snapshot.state !== snapshot.state;
     record.snapshot = structuredClone(snapshot);
     record.title.textContent = name || snapshot.gameId;
@@ -86,27 +86,37 @@ export class MatchWorkspace {
     record.delivery.textContent = delivery ? 'Outbox: ' + delivery.pending + ' pendientes · ' + delivery.delivered + ' entregados' + (delivery.error ? ' · entrega con error' : '') : 'Entrega pendiente de consulta';
     record.finish.disabled = snapshot.state === 'finished' || record.finishing;
     record.finish.textContent = snapshot.state === 'closing' ? 'Reintentar cierre' : 'Finalizar';
-    if (changed) record.needsRefresh = true;
+    if (changed) { record.refreshRevision++; record.needsRefresh = true; }
     if (record.needsRefresh && record.frame) void this.refresh(record);
   }
   async refresh(record) {
     if (record.refreshing || !record.frame) return;
-    const frame = record.frame; record.refreshing = true;
+    const frame = record.frame, generation = record.generation, matchId = record.snapshot.matchId;
+    const active = () => this.records.get(matchId) === record && record.frame === frame && record.generation === generation;
+    record.refreshing = true;
     try {
-      const sent = await this.bridge.refresh(frame);
-      if (record.frame !== frame) return;
-      record.needsRefresh = !sent;
-      if (!sent) record.channel.textContent = 'Refresco pendiente; se reintentará al actualizar el listado.';
+      do {
+        const revision = record.refreshRevision;
+        const sent = await this.bridge.refresh(frame);
+        if (!active()) return;
+        // A successful older read cannot acknowledge a later lifecycle change.
+        record.needsRefresh = !sent || revision !== record.refreshRevision;
+        if (!sent) {
+          record.channel.textContent = 'Refresco pendiente; se reintentará al actualizar el listado.';
+          break; // Persistent failure waits for polling/manual update, never a tight retry loop.
+        }
+      } while (record.needsRefresh);
     } catch {
-      if (record.frame === frame) { record.needsRefresh = true; record.channel.textContent = 'Esperando Bridge; se reintentará el refresco o puedes montar una interfaz nueva.'; }
-    } finally { record.refreshing = false; }
+      if (active()) { record.needsRefresh = true; record.channel.textContent = 'Esperando Bridge; se reintentará el refresco o puedes montar una interfaz nueva.'; }
+    } finally { if (active()) record.refreshing = false; }
   }
   open(snapshot, name) {
     let record = this.records.get(snapshot.matchId);
     if (!record) {
       const d = this.document, card = element(d, 'article', 'match-card'), title = element(d, 'h3'), details = element(d, 'p', 'identity');
       const delivery = element(d, 'p', 'metadata'), channel = element(d, 'p', 'metadata', 'Esperando Bridge'), tools = element(d, 'div', 'tools'), container = element(d, 'div', 'frame-container');
-      record = { card, title, details, delivery, channel, container, frame: null, snapshot: structuredClone(snapshot), finishing: false };
+      record = { card, title, details, delivery, channel, container, frame: null, snapshot: structuredClone(snapshot), finishing: false,
+        generation: 0, refreshRevision: 0, refreshing: false, needsRefresh: false };
       record.finish = button(d, 'Finalizar', () => void this.onFinish(snapshot.matchId));
       const newTab = element(d, 'a', 'button', 'Nueva pestaña'); newTab.href = '/?match=' + encodeURIComponent(snapshot.matchId); newTab.target = '_blank'; newTab.rel = 'noopener';
       tools.append(button(d, 'Seleccionar', () => this.onSelect(snapshot.matchId)), newTab, record.finish,
@@ -128,7 +138,16 @@ export class MatchWorkspace {
     r.channel.textContent = event.state === 'initialized' ? 'Bridge conectado' : event.state === 'error' ? 'Bridge requiere atención; consulta el estado o remonta la vista.' : 'Bridge: ' + event.state;
     if (event.state === 'initialized' && r.needsRefresh) void this.refresh(r);
   }
-  unmount(id) { const r = this.records.get(id); if (r?.frame) { this.bridge.unmount(r.frame); r.frame = null; r.channel.textContent = 'Vista desmontada; la partida permanece en el servidor.'; } }
+  unmount(id) {
+    const r = this.records.get(id); if (!r) return;
+    const frame = r.frame;
+    r.frame = null; r.generation++; r.refreshing = false; r.needsRefresh = false;
+    if (frame) { this.bridge.unmount(frame); r.channel.textContent = 'Vista desmontada; la partida permanece en el servidor.'; }
+  }
+  remove(id) {
+    const r = this.records.get(id); if (!r) return;
+    this.unmount(id); this.records.delete(id); r.card.remove();
+  }
   dispose() { for (const id of this.records.keys()) this.unmount(id); this.records.clear(); this.root.replaceChildren(); }
 }
 
