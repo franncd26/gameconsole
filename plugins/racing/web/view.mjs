@@ -8,10 +8,14 @@ export class RacingView {
   listen(node,type,callback){node.addEventListener(type,callback);this.listeners.push(()=>node.removeEventListener(type,callback));}
   commonBind(actions){this.listen(this.sync,'click',actions.sync);this.listen(this.replay,'click',actions.replay);if(this.start)this.listen(this.start,'click',actions.start);}
   commonRender(model){
-    this.connection.textContent=model.connected?(model.busy?'Enviando…':'Bridge conectado'):'Sin conexión';
+    const labels={ready:'Preparado',playing:'Jugando',manuallyPaused:'Pausado',autoSuspended:'En segundo plano',spectator:'Observador',resyncing:'Sincronizando',uncertain:'Resultado sin confirmar',finished:'Finalizado'};
+    this.connection.textContent=model.connected?(labels[model.presentationState]||'Conectado'):'Sin conexión';
     this.note.textContent=model.note;this.sync.disabled=!model.connected||model.busy;
-    this.replay.hidden=!model.uncertain;this.replay.disabled=model.busy||!model.connected||model.snapshot?.state!=='running';
-    if(this.start)this.start.disabled=!model.connected||model.busy||model.uncertain||model.snapshot?.state!=='running'||model.armed;
+    this.replay.hidden=!model.uncertain;this.replay.disabled=model.busy||!model.connected||!model.canControl||model.snapshot?.state!=='running';
+    if(this.start){
+      this.start.disabled=!model.connected||model.busy||model.uncertain||!model.active||model.snapshot?.state!=='running';
+      this.start.textContent=model.busy?'Esperando sincronización':model.armed?'Pausa':model.presentationState==='ready'?'Jugar':'Continuar';
+    }
     const s=model.snapshot;this.identity.textContent=s?s.gameId+' · '+s.matchId+' · '+s.state+' · v'+s.version:'Esperando INIT';
   }
   dispose(){for(const remove of this.listeners)remove();this.listeners=[];}
@@ -38,7 +42,7 @@ export class RacingView {
     if(data&&data.collisions>this.previousCollisions)this.collisionVersion=s.version;
     this.document.getElementById('track').classList.toggle('flash',Boolean(data&&s.version===this.collisionVersion));this.previousCollisions=data?.collisions??0;
     for(const b of this.document.querySelectorAll('[data-lane], [data-pedal]')){
-      b.disabled=!model.connected||model.uncertain||s?.state!=='running';
+      b.disabled=!model.connected||!model.active||model.uncertain||s?.state!=='running';
       if(b.dataset.pedal){b.classList.toggle('held',model[b.dataset.pedal]);b.setAttribute('aria-pressed',String(model[b.dataset.pedal]));}
     }
     const c=this.context;if(!c)return;const w=this.canvas.width,h=this.canvas.height,lw=w/3;

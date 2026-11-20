@@ -11,6 +11,7 @@
     <span class="course">Lenguajes de Programación · SDK v1</span>
   </header>
   <main>
+    <details class="settings"><summary>Ajustes de juego</summary><label><input id="pauseWhenHidden" type="checkbox" checked> Pausar al ocultar el juego</label><label><input id="resumeWhenVisible" type="checkbox" checked> Reanudar automáticamente al regresar</label><p>Controla solo la actividad de esta vista, no una pausa compartida del servidor. En segundo plano el navegador puede limitar la frecuencia.</p><p id="preferences-status" role="status"></p></details>
     <p id="notice" class="notice" role="status" aria-live="polite">Preparando tu biblioteca…</p>
     <section id="library" class="library"><div class="section-heading"><div><p class="eyebrow">TU PRÓXIMA PARTIDA</p><h1>Una consola. Nuevos desafíos.</h1><p class="muted">Elige un plugin, configura tu partida y juega con sus reglas oficiales.</p></div><button id="reload-catalog">Actualizar biblioteca</button></div>
       <div id="catalog" class="catalog"></div>

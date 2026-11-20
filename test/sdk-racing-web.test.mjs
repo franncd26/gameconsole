@@ -15,15 +15,15 @@ test('Circuito keyboard and touch produce only the three STEP fields, one action
   h.doc.pedals[1].fire('pointercancel');assert.equal(h.controller.brake,false);h.controller.dispose();
 });
 test('Circuito completion, blur, detach and pagehide clear controls and timers',async()=>{
-  const h=setup('racing');await h.controller.start();h.window.fire('keydown',{key:'w'});h.window.fire('blur');assert.equal(h.controller.accelerate,false);assert.equal(h.clock.jobs.size,0);
-  const s=snapshot('racing');s.version=20;s.state='finished';s.data.lap=3;s.data.result='race_completed';h.bridge.publish(s);assert.equal(h.node('result').textContent,'¡Carrera completada!');await h.controller.start();assert.equal(h.clock.jobs.size,0);
+  const h=setup('racing');await h.controller.start();h.window.fire('keydown',{key:'w'});h.window.fire('blur');assert.equal(h.controller.accelerate,false);assert.equal(h.clock.jobs.size,1);
+  h.window.fire('keydown',{key:'w'});const s=snapshot('racing');s.version=20;s.state='finished';s.data.lap=3;s.data.result='race_completed';h.bridge.publish(s);assert.equal(h.controller.accelerate,false);assert.equal(h.node('result').textContent,'¡Carrera completada!');await h.controller.start();assert.equal(h.clock.jobs.size,0);
   h.bridge.emit('detach',{reason:'removed'});h.window.fire('pagehide');assert.equal(h.bridge.disposed,true);assert.equal(h.window.listenerCount,0);assert.equal(h.view.listeners.length,0);
 });
 test('Circuito rejected or dependency_failed action stops emission and keeps confirmed snapshots',async()=>{
   for(const outcome of ['rejected','dependency_failed']){const h=setup('racing');h.bridge.handler=async()=>({outcome,committed:outcome==='dependency_failed',confirmations:outcome==='dependency_failed'?1:0,error:{code:'VERSION_CONFLICT'}});await h.controller.start();await h.clock.step();assert.equal(h.bridge.calls.length,1);assert.equal(h.clock.jobs.size,0);assert.equal(h.controller.snapshot.version,0);h.controller.dispose();}
 });
 
-test('Circuito starts on first focus/click, and resynchronizes after losing focus',async()=>{
+test('Circuito starts voluntarily and keeps its loop after a focus change',async()=>{
   const h=setup('racing');h.window.fire('focus');await h.controller.start();assert.equal(h.controller.armed,true);assert.equal(h.bridge.reads,1);
-  h.window.fire('blur');h.window.fire('focus');assert.equal(h.clock.jobs.size,0);await h.controller.start();assert.equal(h.bridge.reads,2);assert.equal(h.clock.jobs.size,1);h.controller.dispose();
+  h.window.fire('blur');h.window.fire('focus');assert.equal(h.clock.jobs.size,1);assert.equal(h.bridge.reads,1);h.controller.dispose();
 });

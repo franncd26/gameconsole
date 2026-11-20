@@ -1,5 +1,9 @@
 # Fase 3G — Multiinstancia y experiencia de consola
 
+La gestión de foco y presentación aquí descrita se amplía en
+[3H](phase-3h-game-experience.md), con preferencias de suspensión/reanudación y
+coordinación del control entre pestañas. La multiinstancia permanece intacta.
+
 Base: `f9678963a0d088e0d7c306c9fb77ca57e499831c`, rama
 `feature/gameconsole-sdk-v1`. Esta fase modifica presentación y capacidades
 de los tres paquetes. Las decisiones anteriores de una partida por tipo quedan

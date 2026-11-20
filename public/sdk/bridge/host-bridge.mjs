@@ -1,8 +1,8 @@
-import { BridgeError, copyJSON, envelope, fingerprint, randomId, validateMessage, validateResult, validateSnapshot } from './protocol.mjs';
+import { BridgeError, copyJSON, envelope, fingerprint, randomId, validateMessage, validateResult, validateSnapshot, validatePresentation } from './protocol.mjs';
 
 /** One association per iframe. The SDK remains the sole execution queue and state authority. */
 export class HostBridge {
-  #window; #fetch; #crypto; #records = new Map(); #usedFrames = new WeakSet(); #listener; #observer; #status;
+  #window; #fetch; #crypto; #records = new Map(); #usedFrames = new WeakSet(); #drains = new WeakMap(); #listener; #observer; #status;
   constructor({ window = globalThis.window, fetcher = (...args) => globalThis.fetch(...args), crypto = globalThis.crypto, onStatus = () => {} } = {}) {
     this.#window = window; this.#fetch = fetcher; this.#crypto = crypto; this.#status = onStatus;
     this.#listener = (event) => { void this.#receive(event); };
@@ -30,7 +30,7 @@ export class HostBridge {
     const snapshot = validateSnapshot(input);
     if (frame.getAttribute('sandbox') !== 'allow-scripts' || this.#usedFrames.has(frame) || this.#records.size >= 32) throw new BridgeError('INVALID_FRAME');
     const r = { frame, gameId: snapshot.gameId, matchId: snapshot.matchId, snapshot, loaded,
-      generation: 0, channel: null, ready: null, requests: new Map(), busy: false, needsSync: false };
+      generation: 0, channel: null, ready: null, requests: new Map(), unresolved: new Set(), busy: false, needsSync: false };
     r.load = () => {
       if (r.loaded) {
         // WindowProxy survives navigation; it does not identify the new document.
@@ -64,9 +64,25 @@ export class HostBridge {
   }
   detach(frame, reason = 'disposed') {
     const r = this.#records.get(frame); if (!r) return;
+    const drain = Promise.allSettled([...r.requests.values()].map(request => request.pending).filter(Boolean));
+    this.#drains.set(frame, drain);
     this.#invalidate(r, reason); this.#records.delete(frame); frame.removeEventListener('load', r.load); this.#notify(r, 'detached');
   }
   unmount(frame) { this.detach(frame); frame.remove(); }
+  /** Presentation only. Setting false immediately gates new actions; an accepted action is never cancelled. */
+  setPresentation(frame, input) {
+    const p = validatePresentation(input), r = this.#records.get(frame);
+    if (!r) return false;
+    r.presentation = p;
+    return this.#send(r, 'PRESENTATION', randomId(this.#crypto), p);
+  }
+  async waitForIdle(frame) {
+    const r = this.#records.get(frame);
+    if (!r) { await this.#drains.get(frame); return; }
+    // Includes the snapshot read after dispatch. No separate execution queue.
+    await Promise.allSettled([...r.requests.values()].map(request => request.pending).filter(Boolean));
+    if (r.unresolved.size) throw new BridgeError('RESULT_UNKNOWN', true);
+  }
   /** Host-only refresh after an administrative change; no reload or new channel. */
   async refresh(frame) {
     const r = this.#records.get(frame);
@@ -105,7 +121,10 @@ export class HostBridge {
       const s = await this.#read(r);
       if (!this.#active(r, generation)) return;
       this.#adopt(r, s); r.channel = randomId(this.#crypto);
-      if (this.#send(r, 'INIT', m.messageId, { gameId: r.gameId, matchId: r.matchId, options: r.snapshot.options, snapshot: r.snapshot })) this.#notify(r, 'initialized');
+      if (this.#send(r, 'INIT', m.messageId, { gameId: r.gameId, matchId: r.matchId, options: r.snapshot.options, snapshot: r.snapshot })) {
+        if (r.presentation) this.#send(r, 'PRESENTATION', randomId(this.#crypto), r.presentation);
+        this.#notify(r, 'initialized');
+      }
       else { r.channel = null; r.ready = null; }
     } catch { if (this.#active(r, generation)) { r.ready = null; this.#notify(r, 'error', 'SNAPSHOT_UNAVAILABLE'); } }
   }
@@ -127,6 +146,7 @@ export class HostBridge {
       try { await this.#refresh(r, m.messageId, generation); } finally { if (this.#active(r, generation)) r.reading = false; }
       return;
     }
+    if (r.presentation && !r.presentation.canControl) return this.#error(r, m.messageId, 'SPECTATOR');
     const signature = fingerprint(m.payload.action);
     let record = r.requests.get(m.messageId);
     if (record && record.signature !== signature) return this.#error(r, m.messageId, 'MESSAGE_CONFLICT');
@@ -161,11 +181,12 @@ export class HostBridge {
       if (result.snapshot && (result.snapshot.matchId !== r.matchId || result.snapshot.gameId !== r.gameId)) throw new BridgeError('INVALID_HTTP_RESULT');
       if (!this.#active(r, generation)) return;
       record.result = result;
+      r.unresolved.delete(id);
       if (result.snapshot) this.#adopt(r, result.snapshot);
       this.#send(r, 'ACTION_RESULT', id, result);
     } catch {
       if (!this.#active(r, generation)) return;
-      r.needsSync = true; this.#error(r, id, 'RESULT_UNKNOWN', true);
+      r.needsSync = true; r.unresolved.add(id); this.#error(r, id, 'RESULT_UNKNOWN', true);
     }
     if (this.#active(r, generation)) await this.#refresh(r, id, generation);
   }

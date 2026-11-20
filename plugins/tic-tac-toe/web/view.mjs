@@ -8,9 +8,9 @@ export class GatoView {
   listen(node,type,callback){node.addEventListener(type,callback);this.listeners.push(()=>node.removeEventListener(type,callback));}
   commonBind(actions){this.listen(this.sync,'click',actions.sync);this.listen(this.replay,'click',actions.replay);if(this.start)this.listen(this.start,'click',actions.start);}
   commonRender(model){
-    this.connection.textContent=model.connected?(model.busy?'Enviando…':'Bridge conectado'):'Sin conexión';
+    this.connection.textContent=model.connected?(!model.canControl?'Observador':model.busy?'Sincronizando':model.snapshot?.state==='finished'?'Finalizado':'Preparado'):'Sin conexión';
     this.note.textContent=model.note;this.sync.disabled=!model.connected||model.busy;
-    this.replay.hidden=!model.uncertain;this.replay.disabled=model.busy||!model.connected||model.snapshot?.state!=='running';
+    this.replay.hidden=!model.uncertain;this.replay.disabled=model.busy||!model.connected||!model.canControl||model.snapshot?.state!=='running';
     if(this.start)this.start.disabled=!model.connected||model.busy||model.uncertain||model.snapshot?.state!=='running'||model.armed;
     const s=model.snapshot;this.identity.textContent=s?s.gameId+' · '+s.matchId+' · '+s.state+' · v'+s.version:'Esperando INIT';
   }

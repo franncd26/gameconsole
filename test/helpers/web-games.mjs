@@ -46,6 +46,7 @@ export class Bridge {
   constructor(s){this.snapshot=copy(s);this.callbacks=new Map();this.calls=[];this.reads=0;this.disposed=false;this.handler=async()=>({outcome:'completed',committed:false,confirmations:0,snapshot:copy(this.snapshot)});}
   sub(type,fn){if(!this.callbacks.has(type))this.callbacks.set(type,new Set());this.callbacks.get(type).add(fn);return()=>this.callbacks.get(type).delete(fn);}
   onInit(fn){return this.sub('init',fn);} onSnapshot(fn){return this.sub('snapshot',fn);} onResult(fn){return this.sub('result',fn);} onError(fn){return this.sub('error',fn);} onDetach(fn){return this.sub('detach',fn);}
+  onPresentation(fn){return this.sub('presentation',fn);}
   emit(type,value){for(const fn of this.callbacks.get(type)||[])fn(copy(value));}
   init(){this.emit('init',{gameId:this.snapshot.gameId,matchId:this.snapshot.matchId,options:{},snapshot:this.snapshot});}
   publish(s){this.snapshot=copy(s);this.emit('snapshot',s);}

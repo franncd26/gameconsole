@@ -2,6 +2,7 @@ import { ConsoleAPI, ConsoleError } from './console-api.mjs';
 import { PollResource } from './console-stats.mjs';
 import { CatalogView, MatchWorkspace, StatsPanel, element, shortId } from './console-views.mjs';
 import { HostBridge } from './bridge/host-bridge.mjs';
+import { PresentationCoordinator, readPreferences, savePreferences } from './console-presentation.mjs';
 
 export class ConsoleApp {
   constructor({ document, window, api = new ConsoleAPI(), bridge, clock = globalThis }) {
@@ -12,10 +13,17 @@ export class ConsoleApp {
     this.notice = document.getElementById('notice'); this.list = document.getElementById('match-list');
     this.historyList = document.getElementById('history-list');
     this.bridge = bridge || new HostBridge({ window, onStatus: event => this.workspace?.status(event) });
+    try { this.storage = window.localStorage; } catch { /* Optional host-only preferences. */ }
+    this.preferences = readPreferences(this.storage);
+    let channel;
+    try { if (window.BroadcastChannel) channel = new window.BroadcastChannel('gameconsole.control.v1'); } catch { /* Web Locks still excludes competing owners. */ }
+    this.presentation = new PresentationCoordinator({ bridge: this.bridge, locks: window.navigator?.locks, channel,
+      onError: message => { this.notice.textContent = message; }, onChange: (id, control) => this.workspace?.control(id, control) });
     const onError = error => this.error(error);
     this.workspace = new MatchWorkspace({ document, root: document.getElementById('workspace'), bridge: this.bridge,
       historyRoot: document.getElementById('history-workspace'), empty: document.getElementById('workspace-empty'), clock,
-      onSelect: id => void this.select(id), onFinish: id => void this.finish(id), onError });
+      onSelect: id => void this.select(id), onFinish: id => void this.finish(id), onError,
+      onChange: () => this.updatePresentation(), onTakeControl: id => this.presentation.take(id) });
     this.library = new CatalogView({ document, root: document.getElementById('catalog'), onError,
       onCreate: (id, options) => this.create(id, options), onOpen: id => this.select(id), onFinish: id => this.finish(id) });
     this.stats = new StatsPanel({ document, results: document.getElementById('results'), dashboard: document.getElementById('dashboard'),
@@ -33,17 +41,33 @@ export class ConsoleApp {
     this.listen(document.getElementById('reload-catalog'), 'click', () => void this.loadCatalog());
     this.listen(document.getElementById('reload-stats'), 'click', () => { void this.results.refresh(); void this.dashboard.refresh(); });
     this.listen(document.getElementById('reload-matches'), 'click', () => void this.sessions.refresh());
-    this.listen(document, 'visibilitychange', () => { for (const resource of [this.results, this.dashboard, this.sessions]) resource.visibilityChanged(); });
+    this.listen(document, 'visibilitychange', () => { for (const resource of [this.results, this.dashboard, this.sessions]) resource.visibilityChanged(); this.updatePresentation(); });
     this.listen(window, 'pagehide', () => this.dispose());
     for (const section of ['library', 'play', 'analytics']) this.listen(document.getElementById('nav-' + section), 'click', () => this.setSection(section));
     for (const mode of ['focus', 'grid']) this.listen(document.getElementById('mode-' + mode), 'click', () => this.setMode(mode));
+    for (const key of ['pauseWhenHidden', 'resumeWhenVisible']) {
+      const input = document.getElementById(key); input.checked = this.preferences[key];
+      this.listen(input, 'change', () => {
+        this.preferences[key] = input.checked;
+        const saved = savePreferences(this.storage, this.preferences);
+        document.getElementById('preferences-status').textContent = saved ? 'Preferencias guardadas' : 'Preferencias activas en esta pestaña; no fue posible guardarlas.';
+        this.updatePresentation();
+      });
+    }
     this.setSection('library'); this.setMode('focus');
   }
   setSection(section) {
+    this.section = section;
     for (const id of ['library', 'play', 'analytics']) {
       this.document.getElementById(id).hidden = id !== section;
       this.document.getElementById('nav-' + id).setAttribute('aria-pressed', String(id === section));
     }
+    this.updatePresentation();
+  }
+  updatePresentation() {
+    if (!this.workspace || this.disposed) return;
+    this.presentation.sync(this.workspace.records, { section: this.section, mode: this.workspace.mode,
+      selectedId: this.workspace.selectedId, hidden: this.document.hidden, preferences: this.preferences });
   }
   setMode(mode) {
     this.workspace.setMode(mode);
@@ -187,6 +211,6 @@ export class ConsoleApp {
     if (this.disposed) return; this.disposed = true; this.selection++;
     for (const resource of [this.results, this.dashboard, this.sessions]) resource.dispose();
     for (const unsubscribe of this.unsubscribers) unsubscribe(); for (const remove of this.listeners) remove();
-    this.workspace.dispose(); this.bridge.dispose(); this.library.dispose(); this.list.replaceChildren(); this.historyList.replaceChildren(); this.rows.clear();
+    this.presentation.dispose(); this.workspace.dispose(); this.bridge.dispose(); this.library.dispose(); this.list.replaceChildren(); this.historyList.replaceChildren(); this.rows.clear();
   }
 }

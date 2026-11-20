@@ -82,7 +82,7 @@ HTTPS canónico, sin ruta, query ni credenciales. No se confía en Forwarded del
    Gato: easy/medium/hard (hard predeterminado); Snake: 12/20/28; Circuito: tres
    vueltas fijas. La validación definitiva es del SDK.
 2. Crear la partida. Gato utiliza clic o Tab/Enter para colocar X; Prolog decide O.
-   Snake usa Jugar/continuar y flechas/WASD o botones. Circuito usa Activar controles,
+   Snake usa Jugar y flechas/WASD o botones. Circuito usa Jugar,
    mantiene acelerar/frenar y cambia de carril con flechas/A-D o botones.
 3. Crear más partidas, incluso del mismo juego: los tres manifiestos permiten
    **múltiples instancias independientes**. Cuatro Circuitos tienen cuatro UUID,
@@ -97,8 +97,15 @@ HTTPS canónico, sin ruta, query ni credenciales. No se confía en Forwarded del
    Estadísticas generales consulta el dashboard de GameStats cada 5 s, incluidos
    conteos por juego y muestras inválidas. Null/no disponible no equivale a cero.
 
-Las entradas automáticas de Snake/Circuito se suspenden al perder foco; continuar
-resincroniza antes de emitir pasos. Esto no es pause/resume oficial del SDK.
+Snake/Circuito se inician una vez con Jugar; el botón permite Pausa/Continuar.
+Cambiar el foco libera teclas, sin exigir otra activación. En Ajustes, Pausar al
+ocultar y Reanudar al regresar están habilitados por defecto: volver resincroniza
+antes de avanzar. La pausa manual se conserva. Son preferencias de actividad local,
+no pause/resume oficial del SDK ni un cambio de las duraciones de GameStats.
+Con Web Locks, otra pestaña de la misma partida entra como observadora y puede
+Tomar control de manera ordenada. Sin soporte se advierte que no hay exclusividad
+garantizada. No coordina navegadores o equipos diferentes.
+Consultar [comportamiento y límites de 3H](docs/sdk-v1/phase-3h-game-experience.md).
 Finalizar es administrativo; no fabrica victoria ni carrera completada.
 Al confirmarse finished, la vista muestra brevemente el final y libera su canal
 tras 1,8 s. La partida queda en el historial plegable con sus resultados; consultarla

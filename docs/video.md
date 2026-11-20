@@ -25,8 +25,10 @@ evidencia de ejecución nueva. El video público y su publicación quedan pendie
 - Los tres manifiestos permiten varias instancias. Crear otra partida obtiene
   otro UUID; Nueva pestaña conserva el mismo. La vista final se retira tras 1,8 s,
   sin borrar la sesión ni sus estadísticas. Diagnóstico conserva los IDs completos.
-- Los juegos suspenden entradas automáticas al perder foco: usar continuar al
-  cambiar de panel. No llamarlo pausa oficial del SDK.
+- Desde 3H, perder foco libera teclas sin desarmar el juego. Mostrar Ajustes,
+  suspensión por visibilidad y reanudación automática; Pausa manual se conserva.
+  Al abrir la misma partida en otra pestaña, demostrar Observador/Tomar control
+  con Web Locks. No llamarlo pausa oficial ni autorización global del SDK.
 - Evitar tokens, terminales con secretos, rutas privadas y notificaciones personales.
 - Publicar el video con acceso comprobado y adjuntar su URL en la entrega. No se
   crea ni publica ningún video desde este encargo.

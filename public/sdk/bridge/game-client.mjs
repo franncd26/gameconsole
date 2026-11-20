@@ -4,9 +4,9 @@ import { BridgeError, copyJSON, envelope, fingerprint, randomId, validateMessage
 export function createGameBridgeClient({ window = globalThis.window, hostOrigin = new URL(import.meta.url).origin, crypto = globalThis.crypto } = {}) {
   const parsed = new URL(hostOrigin);
   if (!['http:', 'https:'].includes(parsed.protocol) || parsed.origin !== hostOrigin || window.parent === window) throw new BridgeError('INVALID_HOST');
-  const readyId = randomId(crypto), subscribers = Object.fromEntries(['init', 'snapshot', 'result', 'error', 'detach'].map((k) => [k, new Set()]));
+  const readyId = randomId(crypto), subscribers = Object.fromEntries(['init', 'snapshot', 'result', 'error', 'detach', 'presentation'].map((k) => [k, new Set()]));
   const pending = new Map();
-  let channel, identity = null, snapshot = null, disposed = false;
+  let channel, identity = null, snapshot = null, presentation = null, disposed = false;
   const notify = (type, value) => { for (const callback of subscribers[type]) { try { callback(copyJSON(value)); } catch { /* Independent UI observers. */ } } };
   const adopt = (s) => {
     if (s.gameId !== identity.gameId || s.matchId !== identity.matchId) throw new BridgeError('INVALID_MESSAGE');
@@ -16,7 +16,7 @@ export function createGameBridgeClient({ window = globalThis.window, hostOrigin 
   const dispose = () => {
     if (disposed) return;
     disposed = true; rejectAll(); window.removeEventListener('message', receive); window.removeEventListener('load', ready);
-    for (const set of Object.values(subscribers)) set.clear(); channel = undefined; identity = null; snapshot = null;
+    for (const set of Object.values(subscribers)) set.clear(); channel = undefined; identity = null; snapshot = null; presentation = null;
   };
   const receive = (event) => {
     if (disposed || event.source !== window.parent || event.origin !== hostOrigin) return;
@@ -28,8 +28,9 @@ export function createGameBridgeClient({ window = globalThis.window, hostOrigin 
       adopt(m.payload.snapshot); notify('init', { ...identity, snapshot }); return;
     }
     if (!channel || m.channelId !== channel) return;
+    if (m.type === 'PRESENTATION') { presentation = m.payload; notify('presentation', presentation); return; }
     if (m.type === 'DETACH') {
-      rejectAll(); channel = undefined; identity = null; snapshot = null; notify('detach', m.payload);
+      rejectAll(); channel = undefined; identity = null; snapshot = null; presentation = null; notify('detach', m.payload);
       if (m.payload.reason !== 'reloaded') dispose();
       return;
     }
@@ -66,6 +67,7 @@ export function createGameBridgeClient({ window = globalThis.window, hostOrigin 
     subscribers[type].add(callback);
     if (type === 'snapshot' && snapshot) { try { callback(copyJSON(snapshot)); } catch {} }
     if (type === 'init' && identity) { try { callback(copyJSON({ ...identity, snapshot })); } catch {} }
+    if (type === 'presentation' && presentation) { try { callback(copyJSON(presentation)); } catch {} }
     return () => subscribers[type].delete(callback);
   };
   ready();
@@ -74,6 +76,8 @@ export function createGameBridgeClient({ window = globalThis.window, hostOrigin 
     ready,
     getIdentity: () => identity ? copyJSON(identity) : null,
     getSnapshot: () => snapshot ? copyJSON(snapshot) : null,
+    getPresentation: () => presentation ? copyJSON(presentation) : null,
+    onPresentation: (fn) => subscribe('presentation', fn),
     onInit: (fn) => subscribe('init', fn), onSnapshot: (fn) => subscribe('snapshot', fn),
     onResult: (fn) => subscribe('result', fn), onError: (fn) => subscribe('error', fn), onDetach: (fn) => subscribe('detach', fn),
     dispatch: (type, payload, { messageId } = {}) => send('ACTION_REQUEST', { action: { type, payload } }, messageId),

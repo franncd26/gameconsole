@@ -64,6 +64,12 @@ export function validateResult(input) {
 export function envelope(type, messageId, payload, channelId) {
   return validateMessage({ protocol: PROTOCOL, version: VERSION, type, messageId, payload, ...(channelId === undefined ? {} : { channelId }) });
 }
+export function validatePresentation(input) {
+  const p = copyJSON(input);
+  if (!exact(p, ['visible', 'canControl', 'autoPause', 'autoResume'])
+    || Object.values(p).some(v => typeof v !== 'boolean')) throw new BridgeError('INVALID_MESSAGE');
+  return p;
+}
 export function validateMessage(input, direction) {
   const m = copyJSON(input);
   if (!object(m)) throw new BridgeError('INVALID_MESSAGE');
@@ -71,9 +77,10 @@ export function validateMessage(input, direction) {
     ['protocol', 'version', 'type', 'messageId', 'payload', ...(m.type === 'READY' ? [] : ['channelId'])])
     || m.protocol !== PROTOCOL || m.version !== VERSION || !messageId(m.messageId)
     || (m.type !== 'READY' && (typeof m.channelId !== 'string' || !/^[a-f0-9]{32}$/.test(m.channelId)))) throw new BridgeError('INVALID_MESSAGE');
-  const inbound = ['READY', 'ACTION_REQUEST', 'SNAPSHOT_REQUEST'], outbound = ['INIT', 'ACTION_RESULT', 'SNAPSHOT', 'ERROR', 'DETACH'];
+  const inbound = ['READY', 'ACTION_REQUEST', 'SNAPSHOT_REQUEST'], outbound = ['INIT', 'ACTION_RESULT', 'SNAPSHOT', 'ERROR', 'DETACH', 'PRESENTATION'];
   if (!(direction === 'game' ? inbound : direction === 'host' ? outbound : [...inbound, ...outbound]).includes(m.type)) throw new BridgeError('INVALID_MESSAGE');
   switch (m.type) {
+    case 'PRESENTATION': validatePresentation(m.payload); break;
     case 'READY': case 'SNAPSHOT_REQUEST': if (!exact(m.payload, [])) throw new BridgeError('INVALID_MESSAGE'); break;
     case 'ACTION_REQUEST': if (!exact(m.payload, ['action'])) throw new BridgeError('INVALID_MESSAGE'); validateAction(m.payload.action); break;
     case 'INIT':

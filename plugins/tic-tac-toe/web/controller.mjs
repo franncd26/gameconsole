@@ -5,6 +5,7 @@ export class GatoController {
     this.snapshot = null; this.identity = null; this.connected = false;
     this.busy = false; this.disposed = false; this.uncertain = null; this.needsSync = true;
     this.active = !document.hidden;
+    this.presentation = { visible: !document.hidden, canControl: true, autoPause: true, autoResume: true };
     this.note = 'Esperando conexión con GameConsole…';
     this.unsubscribers = [
       bridge.onInit((value) => {
@@ -18,9 +19,9 @@ export class GatoController {
       bridge.onDetach(() => { this.connected = false; this.note = 'Desconectado. Remonta el iframe desde la consola.'; this.render(); this.dispose(); }),
     ];
     this.handlers = {
-      blur: () => this.suspend(),
-      focus: () => { this.active = !document.hidden; if (this.connected && this.needsSync) void this.sync(); else this.render(); },
-      visibilitychange: () => { if (document.hidden) this.suspend(); else { this.active = true; if (this.connected && this.needsSync) void this.sync(); else this.render(); } },
+      blur: () => {},
+      focus: () => { if (this.active && this.connected && this.needsSync) void this.sync(); else this.render(); },
+      visibilitychange: () => { if (!this.hostPresentation) this.present({ ...this.presentation, visible: !document.hidden }); },
       pagehide: () => this.dispose(),
     };
     for (const type of ['blur', 'focus', 'pagehide']) window.addEventListener(type, this.handlers[type]);
@@ -30,6 +31,15 @@ export class GatoController {
       sync: () => void this.sync(),
       replay: () => { if (this.uncertain) void this.act(this.uncertain.type, this.uncertain.payload, this.uncertain); },
     });
+    if (bridge.onPresentation) this.unsubscribers.push(bridge.onPresentation(p => { this.hostPresentation = true; this.present(p); }));
+    this.render();
+  }
+  present(p) {
+    if (this.disposed) return;
+    const before = this.active;
+    this.presentation = structuredClone(p); this.active = p.canControl && (!p.autoPause || p.visible);
+    if (!this.active) this.needsSync = true;
+    else if (!before && !this.busy) void this.sync();
     this.render();
   }
   adopt(snapshot) {
@@ -43,7 +53,7 @@ export class GatoController {
     if (!this.disposed) this.view.render({
       snapshot: this.snapshot ? structuredClone(this.snapshot) : null,
       connected: this.connected, busy: this.busy, uncertain: Boolean(this.uncertain), needsSync: this.needsSync,
-      note: this.note, active: this.active,
+      note: this.note, active: this.active, canControl: this.presentation.canControl,
     });
   }
   report(error) {
@@ -64,7 +74,7 @@ export class GatoController {
     finally { this.busy = false; this.render(); }
   }
   async act(type, payload, replay = null) {
-    if (this.disposed || this.busy || !this.connected || this.snapshot?.state !== 'running' || ((this.uncertain || this.needsSync) && !replay)) return;
+    if (this.disposed || this.busy || !this.connected || !this.active || !this.presentation.canControl || this.snapshot?.state !== 'running' || ((this.uncertain || this.needsSync) && !replay)) return;
     const operation = replay || { type, payload: structuredClone(payload), messageId: this.id() };
     this.busy = true; this.needsSync = true; this.note = 'Procesando…'; this.render();
     let known = false;

@@ -75,8 +75,8 @@ export class CatalogView {
 }
 
 export class MatchWorkspace {
-  constructor({ document, root, historyRoot = root, empty, bridge, onSelect, onFinish, onError, clock = globalThis }) {
-    Object.assign(this, { document, root, historyRoot, empty, bridge, onSelect, onFinish, onError, clock });
+  constructor({ document, root, historyRoot = root, empty, bridge, onSelect, onFinish, onError, clock = globalThis, onChange = () => {}, onTakeControl = () => {} }) {
+    Object.assign(this, { document, root, historyRoot, empty, bridge, onSelect, onFinish, onError, clock, onChange, onTakeControl });
     this.records = new Map(); this.mode = 'focus'; this.selectedId = null;
   }
   upsert(snapshot, name) {
@@ -84,7 +84,9 @@ export class MatchWorkspace {
     const rank = { running: 0, closing: 1, finished: 2 };
     if (snapshot.gameId !== record.snapshot.gameId || snapshot.version < record.snapshot.version
       || (snapshot.version === record.snapshot.version && rank[snapshot.state] < rank[record.snapshot.state])) return;
-    const changed = record.snapshot.state !== snapshot.state;
+    // Only spectators need polled domain updates. An owner's action already reads its
+    // snapshot; a redundant read could race it and produce BRIDGE_BUSY unnecessarily.
+    const changed = record.snapshot.state !== snapshot.state || record.observing && record.snapshot.version !== snapshot.version;
     record.snapshot = structuredClone(snapshot);
     record.title.textContent = name || snapshot.gameId;
     record.badge.textContent = lifecycle[snapshot.state];
@@ -99,6 +101,7 @@ export class MatchWorkspace {
     if (changed) { record.refreshRevision++; record.needsRefresh = true; }
     if (record.needsRefresh && record.frame) void this.refresh(record);
     if (snapshot.state === 'finished') this.complete(record);
+    this.onChange();
   }
   async refresh(record) {
     if (record.refreshing || !record.frame) return;
@@ -137,8 +140,11 @@ export class MatchWorkspace {
       record.remount = button(d, 'Restablecer vista', () => { if (record.snapshot.state !== 'finished') { this.unmount(snapshot.matchId); void this.onSelect(snapshot.matchId); } });
       const detach = button(d, 'Ocultar vista', () => record.snapshot.state === 'finished' ? this.retire(record) : this.unmount(snapshot.matchId));
       tools.append(record.choose, newTab, record.finish);
+      record.control = element(d, 'p', 'control-state');
+      record.claim = button(d, 'Tomar control', () => this.onTakeControl(snapshot.matchId)); record.claim.hidden = true;
+      tools.append(record.claim);
       diagnostics.append(detach, record.remount);
-      card.append(title, badge, tools, banner, container, diagnostics); this.root.append(card); this.records.set(snapshot.matchId, record);
+      card.append(title, badge, tools, banner, container, diagnostics, record.control); this.root.append(card); this.records.set(snapshot.matchId, record);
     }
     this.upsert(snapshot, name);
     if (!record.frame && record.snapshot.state !== 'finished') {
@@ -160,6 +166,15 @@ export class MatchWorkspace {
       if (!record.retired && !record.card.hidden) visible = true;
     }
     if (this.empty) this.empty.hidden = visible;
+    this.onChange();
+  }
+  control(id, state) {
+    const r = this.records.get(id); if (!r) return;
+    r.observing = !state.canControl;
+    r.control.textContent = !state.supported ? 'Control local: este navegador no garantiza exclusividad entre pestañas.'
+      : state.canControl ? 'Control en esta pestaña' : state.pending ? 'Esperando transferencia de control…' : 'Modo observador · otra pestaña puede controlar esta partida';
+    r.claim.hidden = state.canControl || !state.supported;
+    r.claim.textContent = state.pending ? 'Cancelar solicitud' : 'Tomar control';
   }
   complete(record) {
     record.banner.textContent = 'Partida finalizada. Sus resultados permanecen disponibles en el historial.';
@@ -193,6 +208,7 @@ export class MatchWorkspace {
     const frame = r.frame;
     r.frame = null; r.generation++; r.refreshing = false; r.needsRefresh = false;
     if (frame) { this.bridge.unmount(frame); r.channel.textContent = 'Vista desmontada; la partida permanece en el servidor.'; }
+    this.onChange();
   }
   remove(id) {
     const r = this.records.get(id); if (!r) return;
@@ -233,8 +249,9 @@ export class StatsPanel {
     const value = state.data;
     this.results.append(element(this.document, 'p', 'identity', value.gameId + ' · ' + value.matchId + ' · ' + value.state));
     if (state.status !== 'updated') this.results.append(element(this.document, 'p', 'warning', 'Datos de la última consulta; pueden estar desactualizados.'));
-    this.results.append(element(this.document, 'h3', '', 'Métricas de la partida')); this.rows(this.results, value.metrics);
-    this.results.append(element(this.document, 'h3', '', 'Patrones de la partida')); this.rows(this.results, value.patterns, true);
+    this.results.append(element(this.document, 'h3', '', 'Resumen de la partida')); this.rows(this.results, value.metrics.slice(0, 3));
+    const all = element(this.document, 'details', 'diagnostics'); all.append(element(this.document, 'summary', '', 'Más métricas y patrones'));
+    this.rows(all, value.metrics.slice(3)); this.rows(all, value.patterns, true); this.results.append(all);
     if (!value.metrics.length && !value.patterns.length) this.results.append(element(this.document, 'p', 'muted', 'Sin resultados analíticos disponibles en este perfil.'));
   }
   renderDashboard(state) {

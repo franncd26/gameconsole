@@ -1,4 +1,4 @@
-# GameConsole SDK v1 — Fases 0–3G
+# GameConsole SDK v1 — Fases 0–3H
 
 Esta carpeta define el contrato para una evolución incremental. **Están
 implementados manifiestos, registro y la infraestructura local de carga confiable,
@@ -44,6 +44,7 @@ e historial con liberación visual de canales. No cambia Manager, Bridge ni anal
 - [Fase 3E.3 implementada](phase-3e3-console-stats.md): consola principal SDK, opciones dinámicas, pestañas y estadísticas Go/Scala.
 - [Fase 3F preparada](phase-3f-deployment.md): despliegue local, CI y evidencia de integración real pendiente.
 - [Fase 3G implementada](phase-3g-multiinstance-experience.md): multiinstancia, consola enfocada/cuadrícula e historial no destructivo.
+- [Fase 3H implementada](phase-3h-game-experience.md): preferencias de actividad local, reanudación, PRESENTATION y control cooperativo entre pestañas.
 - [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
 
 ## API implementada

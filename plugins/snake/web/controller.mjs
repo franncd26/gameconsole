@@ -5,6 +5,8 @@ export class SnakeController {
     this.snapshot = null; this.identity = null; this.connected = false;
     this.busy = false; this.disposed = false; this.uncertain = null; this.needsSync = true;
     this.active = !document.hidden; this.armed = false; this.timer = null;
+    this.started = false; this.manuallyPaused = false; this.resumePending = false; this.presentationRevision = 0;
+    this.presentation = { visible: !document.hidden, canControl: true, autoPause: true, autoResume: true };
     this.note = 'Esperando conexión con GameConsole…';
     this.direction = null;
     this.unsubscribers = [
@@ -20,9 +22,9 @@ export class SnakeController {
     ];
     this.handlers = {
       keydown: (event) => this.key(event, true), keyup: (event) => this.key(event, false),
-      blur: () => this.suspend(),
-      focus: () => { this.active = !document.hidden; this.render(); },
-      visibilitychange: () => { if (document.hidden) this.suspend(); else { this.active = true; this.render(); } },
+      blur: () => { this.clearInputs(); this.render(); },
+      focus: () => this.render(),
+      visibilitychange: () => { if (!this.hostPresentation) this.present({ ...this.presentation, visible: !document.hidden }); },
       pagehide: () => this.dispose(),
     };
     for (const type of ['keydown', 'keyup', 'blur', 'focus', 'pagehide']) window.addEventListener(type, this.handlers[type]);
@@ -32,6 +34,7 @@ export class SnakeController {
       start: () => void this.start(), sync: () => void this.sync(),
       replay: () => { if (this.uncertain) void this.act(this.uncertain.type, this.uncertain.payload, this.uncertain); },
     });
+    if (bridge.onPresentation) this.unsubscribers.push(bridge.onPresentation(p => { this.hostPresentation = true; this.present(p); }));
     this.render();
   }
   adopt(snapshot) {
@@ -39,14 +42,14 @@ export class SnakeController {
     if (this.identity && (snapshot.matchId !== this.identity.matchId || snapshot.gameId !== this.identity.gameId)) return;
     if (this.snapshot && (snapshot.matchId !== this.snapshot.matchId || snapshot.version < this.snapshot.version)) return;
     this.snapshot = structuredClone(snapshot);
-    if (snapshot.state !== 'running') { this.armed = false; this.clearTimer(); }
+    if (snapshot.state !== 'running') { this.armed = false; this.resumePending = false; this.clearInputs(); this.clearTimer(); }
     this.render();
   }
   render() {
     if (!this.disposed) this.view.render({
       snapshot: this.snapshot ? structuredClone(this.snapshot) : null,
       connected: this.connected, busy: this.busy, uncertain: Boolean(this.uncertain), needsSync: this.needsSync,
-      note: this.note, armed: this.armed, active: this.active,
+      note: this.note, armed: this.armed, active: this.active, presentationState: this.presentationState, canControl: this.presentation.canControl,
     });
   }
   report(error) {
@@ -64,10 +67,15 @@ export class SnakeController {
     this.busy = true; this.clearTimer(); this.render();
     try { this.adopt(await this.bridge.requestSnapshot()); this.adopt(this.bridge.getSnapshot()); this.needsSync = false; return true; }
     catch (error) { this.report(error); return false; }
-    finally { this.busy = false; this.render(); this.schedule(); }
+    finally {
+      this.busy = false; this.render();
+      if (this.resumePending && !this.disposed && !this.uncertain) {
+        this.resumePending = false; queueMicrotask(() => { void this.resume(); });
+      } else this.schedule();
+    }
   }
   async act(type, payload, replay = null) {
-    if (this.disposed || this.busy || !this.connected || this.snapshot?.state !== 'running' || ((this.uncertain || this.needsSync) && !replay)) return;
+    if (this.disposed || this.busy || !this.connected || !this.active || !this.presentation.canControl || this.snapshot?.state !== 'running' || ((this.uncertain || this.needsSync) && !replay)) return;
     const operation = replay || { type, payload: structuredClone(payload), messageId: this.id() };
     this.busy = true; this.needsSync = true; this.clearTimer(); this.note = 'Procesando…'; this.render();
     let known = false;
@@ -87,21 +95,51 @@ export class SnakeController {
       this.report(error);
     } finally {
       this.busy = false; this.render();
-      if (!this.disposed) this.schedule();
+      if (!this.disposed) { if (this.resumePending && !this.uncertain) void this.resume(); else this.schedule(); }
     }
   }
   clearTimer() { if (this.timer !== null) this.clock.clearTimeout(this.timer); this.timer = null; }
-  suspend() {
-    this.active = false; this.armed = false; this.needsSync = true; this.direction = null;
-    this.clearTimer();
-    this.note = 'Entradas suspendidas. Vuelve a activar los controles tras consultar el estado.'; this.render();
+  get presentationState() {
+    if (this.snapshot && this.snapshot.state !== 'running') return 'finished';
+    if (this.uncertain) return 'uncertain';
+    if (!this.presentation.canControl) return 'spectator';
+    if (this.manuallyPaused) return 'manuallyPaused';
+    if (!this.active) return 'autoSuspended';
+    if (this.busy || this.needsSync && this.started) return 'resyncing';
+    return this.armed ? 'playing' : 'ready';
   }
+  clearInputs() { this.direction = null; }
+  present(p) {
+    if (this.disposed) return;
+    const before = this.active;
+    if ((!p.visible && this.presentation.visible) || !p.canControl) this.clearInputs();
+    this.presentation = structuredClone(p);
+    this.active = p.canControl && (!p.autoPause || p.visible);
+    if (before !== this.active) {
+      this.presentationRevision++; this.clearInputs(); this.clearTimer(); this.needsSync = true; this.armed = false;
+      this.resumePending = this.active && this.started && !this.manuallyPaused && p.autoResume && !this.uncertain;
+      if (this.resumePending && !this.busy) void this.resume();
+    }
+    this.render();
+  }
+  suspend() { this.present({ ...this.presentation, visible: false }); }
   async start() {
-    if (this.disposed || !this.connected || this.busy || this.uncertain || this.document.hidden) return;
-    this.active = true;
+    if (this.armed) {
+      this.manuallyPaused = true; this.armed = false; this.resumePending = false;
+      this.clearTimer(); this.clearInputs(); this.render(); return;
+    }
+    if (this.disposed || !this.connected || this.busy || this.uncertain || !this.active) return;
+    this.started = true; this.manuallyPaused = false;
+    return this.resume();
+  }
+  async resume() {
+    if (this.disposed || this.busy || this.uncertain || !this.active || this.manuallyPaused || !this.connected) return;
+    this.resumePending = false;
+    const revision = this.presentationRevision;
     if (!await this.sync()) return;
-    if (this.disposed || !this.active || !this.connected || this.snapshot?.state !== 'running' || this.uncertain) return;
-    this.armed = true; this.note = 'Controles activos'; this.schedule(); this.render();
+    if (this.disposed || !this.active || !this.connected || this.snapshot?.state !== 'running' || this.uncertain || this.manuallyPaused) return;
+    if (revision !== this.presentationRevision) { if (this.resumePending) return this.resume(); return; }
+    this.armed = true; this.note = 'Jugando'; this.schedule(); this.render();
   }
   schedule() {
     this.clearTimer();

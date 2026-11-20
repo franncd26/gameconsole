@@ -14,11 +14,11 @@ test('Snake keyboard/touch intent and slow responses never overlap or accumulate
   h.doc.directions[3].fire('click');d.resolve({outcome:'completed',committed:true,confirmations:1});await settle();assert.equal(h.clock.jobs.size,1);
   await h.clock.step();assert.equal(h.bridge.calls[1].payload.direction,'right');h.controller.dispose();assert.equal(h.clock.jobs.size,0);
 });
-test('Snake blur/visibility suspend input; explicit continue resynchronizes before moving',async()=>{
-  const h=setup('snake');await h.controller.start();h.window.fire('blur');assert.equal(h.clock.jobs.size,0);assert.equal(h.controller.direction,null);
-  h.window.fire('focus');await settle();assert.equal(h.bridge.reads,1);assert.equal(h.clock.jobs.size,0);
-  await h.controller.start();assert.equal(h.bridge.reads,2);assert.equal(h.clock.jobs.size,1);h.doc.hidden=true;h.doc.fire('visibilitychange');assert.equal(h.clock.jobs.size,0);
-  h.doc.hidden=false;h.doc.fire('visibilitychange');await settle();assert.equal(h.clock.jobs.size,0);h.controller.dispose();
+test('Snake blur releases input without disarming; visibility return automatically resynchronizes',async()=>{
+  const h=setup('snake');await h.controller.start();h.window.fire('blur');assert.equal(h.clock.jobs.size,1);assert.equal(h.controller.direction,null);
+  h.window.fire('focus');await settle();assert.equal(h.bridge.reads,1);assert.equal(h.clock.jobs.size,1);
+  h.doc.hidden=true;h.doc.fire('visibilitychange');assert.equal(h.clock.jobs.size,0);
+  h.doc.hidden=false;h.doc.fire('visibilitychange');await settle();assert.equal(h.bridge.reads,2);assert.equal(h.clock.jobs.size,1);h.controller.dispose();
 });
 test('Snake terminal snapshots and detach stop timers; no stale snapshot rollback',async()=>{
   const h=setup('snake');await h.controller.start();const s=snapshot('snake');s.version=4;s.state='finished';s.data.result='game_over';h.bridge.publish(s);

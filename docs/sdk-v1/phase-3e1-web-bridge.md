@@ -1,5 +1,9 @@
 # Fase 3E.1 — recursos web y GameConsole Bridge v1
 
+Actualización posterior: [3H](phase-3h-game-experience.md) añade el mensaje
+host → juego PRESENTATION y observación defensiva de presentación, manteniendo
+la versión 1, validación de canal/origen/source, CSP y sandbox.
+
 Infraestructura implementada para abrir páginas de plugins confiables en iframe,
 vincularlas con una partida SDK y comunicar datos JSON. Los tres HTML solo
 muestran conexión, gameId, matchId, state y version. **No son interfaces jugables**;

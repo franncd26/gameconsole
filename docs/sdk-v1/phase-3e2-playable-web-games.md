@@ -1,5 +1,9 @@
 # Fase 3E.2 — Interfaces jugables independientes
 
+La política de foco descrita en esta fase histórica fue sustituida por
+[3H](phase-3h-game-experience.md): blur libera entradas sin desarmar, la consola
+comunica visibilidad y preferencias, y el control se coordina entre pestañas.
+
 Base: `f1c0eef78720dee7396d97f94c591776dc5ee838`, rama
 `feature/gameconsole-sdk-v1`. Esta fase modifica exclusivamente los recursos web
 de los tres paquetes, añade pruebas y documentación. La consola histórica,
