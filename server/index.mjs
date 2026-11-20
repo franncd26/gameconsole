@@ -7,6 +7,7 @@ import { EventOutbox } from "./outbox.mjs";
 import { decide } from "./prolog.mjs";
 import { connectSDK, prepareSDKFromEnvironment } from "./sdk/bootstrap.mjs";
 import { createSDKHTTP } from "./sdk/http-api.mjs";
+import { createWebAssets } from "./sdk/web-assets.mjs";
 
 const publicDir = fileURLToPath(new URL("../public/", import.meta.url));
 const types = {
@@ -25,6 +26,7 @@ export function createApp({
   const matches = new Map(),
     outbox = new EventOutbox(statsURL, { fetcher: statsFetcher });
   const sdkRuntime = connectSDK(sdk, outbox);
+  const handleWeb = createWebAssets(sdkRuntime, { bridgeDirectory: path.join(publicDir, 'sdk/bridge') });
   const handleSDK = createSDKHTTP(sdkRuntime, {
     ...sdkHTTP, outbox, statsURL, fetcher: statsFetcher,
   });
@@ -75,6 +77,9 @@ export function createApp({
         "Content-Security-Policy",
         "default-src 'self'; style-src 'self'; script-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'",
       );
+      // Inspect raw paths before URL normalization could erase traversal segments.
+      if (req.url === '/sdk/web' || req.url.startsWith('/sdk/web/') || req.url.startsWith('/sdk/bridge/'))
+        return await handleWeb(req, res);
       const url = new URL(req.url, "http://localhost"),
         p = url.pathname;
       if (p === "/api/sdk" || p.startsWith("/api/sdk/"))
@@ -156,6 +161,8 @@ export function createApp({
       if (!target.startsWith(publicDir))
         throw new GameError("Archivo no disponible.", 404);
       const content = await readFile(target);
+      if (path.extname(target) === '.html')
+        res.setHeader('Content-Security-Policy', res.getHeader('Content-Security-Policy') + "; frame-src 'self'");
       res.writeHead(200, {
         "Content-Type":
           types[path.extname(target)] || "application/octet-stream",

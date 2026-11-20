@@ -9,10 +9,12 @@ class PreparedSDK {
   #factory;
   #catalog;
   #trusted;
-  constructor(factory, catalog, ids) {
+  #webPackages;
+  constructor(factory, catalog, ids, packages) {
     this.#factory = factory;
     this.#catalog = catalog;
     this.#trusted = new Set(ids);
+    this.#webPackages = new Map(packages.map((p) => [p.manifest.id, p]));
     Object.freeze(this);
   }
   connect(outbox) {
@@ -21,6 +23,8 @@ class PreparedSDK {
       manager,
       catalog: () => structuredClone(this.#catalog),
       isTrusted: (id) => this.#trusted.has(id),
+      // Host-only metadata, never part of publicCatalog or any JSON response.
+      webPackage: (id) => this.#trusted.has(id) ? structuredClone(this.#webPackages.get(id)) : undefined,
       async shutdown() {
         let sessions;
         try { sessions = await manager.list(); }
@@ -62,7 +66,8 @@ export async function prepareSDK({ pluginsDirectory, trustedIds } = {}) {
   try { for (const id of trustedIds) await loader.load(id); }
   catch { throw new SDKError('SDK_PLUGIN_FAILED', 'No se pudo cargar la interfaz de un plugin confiable.'); }
   return new PreparedSDK(new GameSessionFactory(loader),
-    registry.publicCatalog().filter((m) => trustedIds.includes(m.id)), trustedIds);
+    registry.publicCatalog().filter((m) => trustedIds.includes(m.id)), trustedIds,
+    trustedIds.map((id) => registry.get(id)));
 }
 
 export function connectSDK(prepared, outbox) {
