@@ -1,68 +1,58 @@
-# Estado de verificación y entrega
+# Verificación y entrega
 
-Proyecto 2 · Entrega prevista: **20 de noviembre de 2026, antes de las 22:00, Costa Rica**.
-Este registro distingue implementación, pruebas locales y certificación del commit entregado.
+**Proyecto 2 — Lenguajes de Programación, TEC**
 
-## Funcionalidad y evidencia
+La entrega incluye el código fuente de GameConsole, los tres juegos (Gato, Snake y Circuito), la lógica Prolog, los contratos de integración con GameStats, la configuración Docker y el pipeline de CI/CD.
 
-| Área | Estado y alcance de la comprobación |
+## Comprobaciones técnicas
+
+| Requisito | Evidencia |
 | --- | --- |
-| Juegos académicos | Gato, Snake y Circuito como paquetes independientes, interfaces web, múltiples instancias y Bridge implementados. |
-| Reglas e IA | Reglas oficiales en el servidor; Gato utiliza SWI-Prolog real. Las pruebas locales incluyen la suite histórica de Prolog. |
-| SDK/HTTP/Outbox | Contratos, aislamiento, idempotencia, fallos y entrega cubiertos por pruebas Node; los dobles analíticos no certifican Go/Scala. |
-| Integración real previa | El registro local `evidence/sdk-integration.json` contiene status=passed y transport=configured-http-services; incluye Prolog, entrega, resultados provisionales/finales y dashboard. |
-| Importador experimental | El equipo comprobó despliegue e importación real de Wall Defender, dos partidas y métricas Go/Scala. No equivale a un cuarto juego académico. |
-| Rollback experimental / victoria | Pendiente comprobación manual de perfil inválido y victoria de Wall Defender tras nueve oleadas. |
-| CI del PR | El run enlazado abajo falló en verify por una prueba cancelada; integrated quedó omitido. La corrección local requiere publicación y una nueva ejecución. |
-| Video | Guion interno disponible; grabación, publicación y enlace definitivo pendientes. |
+| Tres juegos web con POO | Paquetes independientes con clases de reglas y sesiones. |
+| Inteligencia Prolog | Gato usa SWI-Prolog para elegir jugadas; se comprueba con pruebas automatizadas e integración. |
+| Partidas concurrentes | Identificadores de partida distintos, estado aislado y operaciones serializadas por instancia. |
+| Eventos compatibles | Contrato GameStats v1 y envío ordenado a Go mediante EventOutbox. |
+| Estadísticas durante el juego | Consultas por partida y dashboard general obtenidos de GameStats Go/Scala. |
+| Construcción y deployment | Docker Compose inicia consola, Go y Scala, con Prolog integrado en el servicio Node. |
+| CI/CD | Workflow que verifica pruebas y sintaxis, construye imágenes y ejecuta la integración real. |
 
-El informe local de integración SDK comenzó el 19/11/2026 a las 23:49 de Costa Rica
-(`2026-11-20T05:49:11.920Z`). Conserva IDs, eventos, source/basis y resultados de los
-tres juegos. Es evidencia de esa ejecución previa; no certifica por sí solo la
-revisión final del PR ni sustituye su pipeline integrado.
+## Resultados de CI/CD
 
-La comprobación manual del importador se registra a partir del informe del equipo;
-no cuenta con un artefacto adjunto versionado.
-Los informes `evidence/` se conservan fuera de Git y deben archivarse para la entrega.
+La [ejecución de GitHub Actions del 20 de noviembre de 2026](https://github.com/JusMH/gameconsole/actions/runs/44814482222) finalizó correctamente.
 
-## CI y corrección del plazo global
+- **Verificación:** 342 pruebas Node aprobadas, sin fallos ni cancelaciones, junto con las pruebas de Prolog.
+- **Integración:** construcción y arranque de los tres servicios Docker, comprobación de los tres juegos, decisión real en Prolog y consulta de resultados Go/Scala.
+- **Resultado del ejecutor integrado:** `status: passed`.
+- **Evidencia:** [artefacto sdk-integration](https://github.com/JusMH/gameconsole/actions/runs/44814482222/artifacts/14669531219).
 
-- [PR #1](https://github.com/JusMH/gameconsole/pull/1): experiment/live-plugin-import → main.
-- [Run 44808432657](https://github.com/JusMH/gameconsole/actions/runs/44808432657):
-  verify con 341 pruebas, 340 aprobadas, 0 fallos de aserción y 1 cancelada.
-- La promesa sin transporte activo no mantenía vivo el event loop de Node.
-  El plazo global usa ahora AbortController y un setTimeout referenciado, limpiado
-  en finally; conserva GLOBAL_TIMEOUT, límites HTTP, cancelación y limpieza de partidas.
-- Validación local con Node 22.13.1: cinco repeticiones de la suite focalizada sin
-  cancelaciones; la suite ampliada pasa 342 pruebas. Sintaxis: 120 archivos.
-  También se verifica la liberación del temporizador en éxito, fallo y error de evidencia.
+Estas pruebas automatizadas no sustituyen la demostración visual de los juegos y su interfaz.
 
-La corrección no está certificada por GitHub Actions hasta publicarla y ejecutar
-el workflow del SHA definitivo. La integración académica definitiva sigue pendiente
-del job integrated; la ejecución manual previa no cambia ese estado.
+## Reproducción del sistema
 
-## Lista de cierre
+```powershell
+git clone https://github.com/JusMH/gameconsole.git
+cd gameconsole
+node scripts/deploy.mjs
+```
 
-1. Revisar/publicar los cambios y conservar el SHA definitivo.
-2. Ejecutar Actions en esa revisión: verify y workflow_dispatch con integration=true.
-   Guardar URL, estado y artefacto sdk-integration; no reutilizar un run anterior.
-3. Confirmar catálogo de tres, Gato/Prolog, Snake, Circuito, concurrencia, controles
-   de teclado y estadísticas en el entorno que se mostrará en la entrega.
-4. Archivar evidencia real y diferenciar datos de dobles, analítica provisional/final
-   y confirmación local frente a entrega a Go.
-5. Completar el [guion de video](video.md) con una grabación de 10–13 minutos,
-   comprobar acceso al enlace y adjuntarlo a la entrega.
-6. Si se presenta el experimento, identificarlo como adicional y no dar por probados
-   los dos escenarios manuales aún pendientes.
+Abrir `http://127.0.0.1:3000/`. El catálogo académico presenta exactamente tres juegos. Para detener el entorno:
 
-El deployment es Docker Compose local, sin alojamiento remoto ni persistencia de
-partidas entre reinicios. El importador persiste paquetes/perfiles, no sesiones.
+```powershell
+node scripts/deploy.mjs --stop
+```
 
-## Herramientas de apoyo
+Las instrucciones de uso, requisitos y pruebas locales están en el [README](../README.md); la justificación técnica se encuentra en [arquitectura](arquitectura.md) e [integración](integracion.md).
 
-Se utilizó Codex como herramienta de apoyo al desarrollo y revisión. La responsabilidad
-sobre código, pruebas y entrega corresponde al equipo. La declaración formal deberá
-ajustarse a la normativa del curso; este registro no presupone una política docente.
+## Demostración en video
 
-El [registro de verificaciones anteriores](verificacion.md) se conserva como historial
-y no como certificación del commit definitivo.
+El video debe mostrar Gato contra Prolog, Snake, Circuito, partidas simultáneas, eventos y estadísticas generales y por juego obtenidas de GameStats. La duración prevista es inferior a 15 minutos.
+
+**Enlace público del video:** pendiente de incorporar al finalizar su publicación.
+
+## Alcance y limitaciones
+
+El deployment se realiza con Docker Compose en un entorno local. Las partidas y los eventos pendientes residen en memoria y no se conservan tras reiniciar los procesos.
+
+La configuración de entrega contiene tres juegos. El importador opcional de otros paquetes es una extensión separada y no modifica ese catálogo académico.
+
+**Herramientas de apoyo:** se utilizó Codex como asistencia durante el desarrollo y revisión; las decisiones, pruebas y responsabilidad de la entrega corresponden al equipo.

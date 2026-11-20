@@ -1,96 +1,70 @@
 # Arquitectura y decisiones técnicas
 
-GameConsole separa la interfaz anfitriona, el runtime SDK, los videojuegos y la
-analítica. La configuración académica carga Gato, Snake y Circuito; el anfitrión
-selecciona paquetes por metadatos y confianza, sin condiciones por gameId en la API SDK.
+GameConsole integra una consola web, tres videojuegos orientados a objetos, un motor de decisiones en Prolog y la plataforma GameStats. Cada componente mantiene una responsabilidad definida.
 
 ```text
-Consola web → HostBridge ↔ iframe del plugin / GameBridgeClient
-                    ↓ HTTP /api/sdk/
-Registry → Loader → Factory → GameInstanceManager → Session / Rules
-                                      │                 │
-                                      │         Gato → PrologAdapter → SWI-Prolog
-                                      ↓
-                     GameEventAdapter → OutboxEventSink → EventOutbox
-                                                           ↓
-                                                    GameStats Go
-                                                           ↓
-                                                    GameStats Scala
+Navegador: Biblioteca, partidas, cuadrícula y estadísticas
+       │                   │
+       │             iframe + GameBridgeClient
+       ▼                   ▼
+API de GameConsole ── GameInstanceManager
+       │                   │
+       │              Sesión + reglas del juego
+       │                   └── Gato → PrologAdapter → SWI-Prolog
+       ▼
+GameEventAdapter → EventOutbox → GameStats Go → GameStats Scala
+       ▲                                               │
+       └───────────── Consultas de resultados ─────────┘
 ```
 
-## Paquetes y orientación a objetos
+## Orientación a objetos y módulos de juego
 
-Cada paquete de `plugins/` contiene `game.json`, módulos de servidor, recursos web
-y perfil analítico. `GatoRules`, `SnakeRules` y `RacingRules` encapsulan reglas y
-física; sus clases Session coordinan acciones con el contexto SDK. Gato incluye
-su propio adaptador y programa Prolog. Los plugins no importan las clases históricas
-del host ni comparten estado mutable de partida.
+Los tres videojuegos son paquetes autónomos ubicados en `plugins/`. Cada uno contiene `game.json`, código de servidor, interfaz web y un perfil de estadísticas.
 
-Cada sesión usa una celda `context.createState`. Una transición propone nuevos
-datos y sus eventos mediante `confirmTransition`; el host controla aceptación,
-ciclo de vida y versión pública. Las vistas solo representan snapshots y envían
-intenciones. No deciden victorias, colisiones, IA ni estadísticas.
+- **Reglas:** `GatoRules`, `SnakeRules` y `RacingRules` encapsulan las decisiones propias de cada juego.
+- **Sesiones:** los objetos `GameSession` de cada paquete administran su estado, reciben acciones y proponen transiciones confirmables.
+- **Abstracción:** `GameSessionFactory` crea sesiones mediante una interfaz común. El código anfitrión no necesita interpretar los movimientos de cada videojuego.
+- **Encapsulación:** las reglas y el estado oficial se ejecutan en Node.js; la interfaz web solo envía intenciones y representa los datos confirmados.
 
-## Runtime y concurrencia
+Se privilegia la composición entre componentes frente a introducir herencia donde no resulta necesaria.
 
-- **GameRegistry:** descubre y valida metadatos sin importar código.
-- **GamePluginLoader:** carga exclusivamente módulos registrados y confiables y
-  comprueba su interfaz. Descubrimiento no equivale a autorización.
-- **GameSessionFactory:** aplica opciones/defaults y valida participantes, datos
-  iniciales y una sesión independiente antes de publicarla.
-- **GameInstanceManager:** mantiene un Map por UUID, serializa operaciones de cada
-  partida y administra lifecycle, versiones e historial acotado de requestId.
+## Componentes principales
 
-Los tres manifiestos permiten múltiples instancias. Una partida no bloquea a otra;
-la validación genérica de `multipleInstances:false` sigue disponible para otros
-paquetes. Abrir el mismo UUID en otra pestaña crea otra vista de la misma sesión.
-Web Locks coordina el control local entre pestañas compatibles; el servidor conserva
-la autoridad y no existe exclusión global entre equipos.
-
-## Presentación, Bridge y Prolog
-
-ConsoleApp, CatalogView, MatchWorkspace y StatsPanel distribuyen responsabilidades
-del host. Un Map mantiene contenedores e iframe estables al cambiar selección o
-estadísticas. El Bridge valida mensajes, fuente, origen y canal por iframe.
-Los juegos se cargan con `sandbox="allow-scripts"`, sin allow-same-origin.
-Origen opaco no autentica por sí solo un documento; navegar exige un montaje nuevo.
-
-Visibilidad, pausa manual y reanudación son estados locales de presentación.
-No modifican el lifecycle SDK ni los tiempos analíticos. Las consultas estadísticas
-se acotan y no participan en la cola de acciones.
-
-Gato ejecuta sus tres estrategias en SWI-Prolog: reglas básicas, reglas tácticas y
-minimax. Node invoca un proceso sin shell, con timeout, límites de salida y validación
-de la respuesta. La jugada humana se confirma antes de consultar la IA; si falla
-la dependencia, la X permanece y RETRY_AI puede continuar con otra solicitud.
-
-## Eventos, analítica y patrones
-
-| Patrón | Aplicación y razón |
+| Componente | Responsabilidad |
 | --- | --- |
-| Registry y Factory | Separan catálogo, carga confiable y construcción de sesiones; evitan seleccionar clases por gameId. |
-| Adapter | GameEventAdapter crea el sobre v1; OutboxEventSink adapta aceptación local al transporte existente; PrologAdapter delimita el proceso externo. |
-| Facade | API SDK, ConsoleAPI y Bridge ofrecen operaciones genéricas sin exponer handles internos al navegador. |
-| Observer | Suscriptores de Bridge y recursos estadísticos actualizan vistas mediante copias defensivas. |
-| State | Lifecycle del host y celda de dominio delimitan autoridades y transiciones; no hay una segunda versión mutable en el plugin. |
-| Dependency Injection | Contexto, sink, fetcher, reloj, aleatoriedad y adaptador de IA permiten aislamiento y pruebas deterministas. |
+| `GameRegistry` y `GamePluginLoader` | Descubrir paquetes, validar metadatos y cargar implementaciones autorizadas. |
+| `GameSessionFactory` | Validar opciones y participantes; preparar una sesión independiente. |
+| `GameInstanceManager` | Administrar partidas por `matchId`, su ciclo de vida, versiones y acciones. |
+| `HostBridge` y `GameBridgeClient` | Comunicar la consola con las interfaces de los juegos dentro de iframes. |
+| `PrologAdapter` | Enviar el tablero de Gato a SWI-Prolog y recibir su decisión. |
+| `GameEventAdapter` y `EventOutbox` | Construir eventos compatibles y entregarlos a GameStats. |
 
-EventOutbox conserva orden por matchId, reintenta fallos y verifica un 409 por eventId.
-La aceptación de un lote es completa en memoria, no una transacción durable con Go.
-Go organiza eventos y snapshots; Scala interpreta perfiles y calcula métricas y
-patrones. GameConsole no sustituye esos cálculos por sumas o promedios locales.
+## Inteligencia de juego en Prolog
 
-## Compatibilidad y extensión experimental
+En **Gato**, el usuario juega contra la computadora. Node proporciona el estado del tablero a SWI-Prolog y aplica la casilla calculada por el programa lógico. La dificultad alta utiliza **minimax**; las demás dificultades aplican estrategias basadas en reglas y prioridades. La respuesta se valida antes de confirmar la jugada.
 
-`server/games.mjs`, sus clases Match/TicTacToe/Snake/Racing y las rutas `/api/matches`
-pertenecen a la implementación histórica de compatibilidad. No son la base de los
-plugins actuales. Con SDK deshabilitado, `/` conserva esa interfaz histórica.
+La estrategia no consiste en escoger movimientos aleatorios. En caso de error del proceso Prolog, la jugada humana ya confirmada permanece y puede reintentarse la decisión de la computadora.
 
-El [importador experimental](sdk-v1/phase-3i2-plugin-importer.md) agrega paquetes
-autorizados al registro vivo sin reemplazar el Manager. Publica perfiles persistentes
-y un supervisor reinicia solo el proceso Scala, con verificación de carga y rollback.
-Está separado del entorno académico; no permite ejecutar JAR directamente.
+## Concurrencia e identidad
 
-Límites: memoria no durable, 500 partidas, 32 canales por HostBridge, sin cuentas
-ni entrega exactamente una vez. El sandbox web no protege al host de código Node
-no confiable. Los [contratos HTTP y eventos](integracion.md) detallan los fallos.
+Cada partida recibe un `matchId` único, estado independiente y cola de operaciones propia. Es posible ejecutar varias instancias del mismo juego o de juegos distintos, tanto en una consola como en varias pestañas.
+
+El servidor serializa las acciones **dentro de una misma partida** sin imponer una cola única a todas las sesiones. El `EventOutbox` conserva el orden de los eventos por partida y reintenta la comunicación con Go. Los identificadores `gameId`, `matchId` y `eventId` evitan mezclar eventos concurrentes.
+
+## Patrones de diseño
+
+| Patrón | Aplicación concreta |
+| --- | --- |
+| **Factory** | `GameSessionFactory` crea sesiones a partir del contrato común de cada plugin. |
+| **Registry** | `GameRegistry` permite descubrir juegos sin una selección fija por identificador. |
+| **Adapter** | `GameEventAdapter`, `OutboxEventSink` y `PrologAdapter` conectan contratos diferentes. |
+| **Facade** | La API SDK y el Bridge exponen operaciones acotadas sin entregar objetos internos al navegador. |
+| **Observer** | Las suscripciones del Bridge notifican cambios de snapshots y resultados a las vistas. |
+
+## Estadísticas y límites
+
+GameConsole confirma el estado de juego, Go recibe eventos y Scala calcula las métricas. La consola consulta los resultados mientras las partidas están abiertas y presenta también las estadísticas generales. **No recalcula métricas de GameStats en el navegador.**
+
+Los datos de partida y los eventos pendientes no son persistentes entre reinicios. El control entre pestañas mediante Web Locks depende del navegador y no representa una autenticación global. El deployment académico incluye exactamente tres juegos.
+
+Los contratos de eventos y consultas se describen en [integración](integracion.md).

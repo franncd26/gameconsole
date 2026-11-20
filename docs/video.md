@@ -1,31 +1,28 @@
-# Guion interno de demostración — 12 a 13 minutos
+# Guion de demostración — GameConsole
 
-El guion organiza la grabación; no constituye evidencia de un video terminado.
-Usar la revisión validada del proyecto y mantener la duración por debajo de 15 minutos.
+**Duración objetivo: 12 a 13 minutos. Límite: 15 minutos.**
 
-| Tiempo | Contenido |
+La demostración debe realizarse con el deployment académico de **Gato, Snake y Circuito**, utilizando Go, Scala y Prolog reales.
+
+| Tiempo aproximado | Demostración |
 | --- | --- |
-| 0:00–0:45 | Autores, objetivo académico y separación entre consola, Prolog, Go y Scala. |
-| 0:45–1:45 | Tres servicios Compose saludables; consola SDK y catálogo de los tres juegos. |
-| 1:45–3:45 | Gato: dificultad, X humana y O de Prolog real; decisión observable y resultado. |
-| 3:45–5:00 | Snake: controles, manzana, puntos confirmados y cierre por colisión. |
-| 5:00–6:45 | Circuito: carriles, aceleración/freno, obstáculos, vueltas y tiempos. |
-| 6:45–8:00 | Partidas independientes, cuadrícula, Ctrl+Alt+J/K y cuatro Circuitos con UUID distintos; Nueva pestaña comparte una sesión. |
-| 8:00–9:15 | Métricas por partida y generales; provisional/final, source/basis y distinción entrega/análisis. |
-| 9:15–10:15 | POO, Registry/Factory, Adapter/Facade, Observer y autoridad del servidor. |
-| 10:15–11:15 | Estado real de CI del SHA presentado, artefacto de integración y deployment local. Si sigue pendiente, indicarlo expresamente. |
-| 11:15–12:00 | Fallos y recuperación: X confirmada, RETRY_AI, eventos pendientes, memoria y apagado. |
-| 12:00–13:00, opcional | Importador como experimento separado: Wall Defender, dos sesiones y métricas. No presentar rollback o victoria de nueve oleadas como verificados. |
+| **0:00–1:00** | Presentar GameConsole, las tecnologías y los tres servicios Docker saludables. Abrir la biblioteca. |
+| **1:00–3:00** | Jugar Gato contra la computadora; explicar cómo el tablero llega a SWI-Prolog y cómo se ejecuta su decisión. |
+| **3:00–4:30** | Jugar Snake, moverse, comer una manzana y observar los eventos y estadísticas. |
+| **4:30–6:00** | Jugar Circuito: carriles, aceleración, obstáculos y registro de vueltas. |
+| **6:00–8:00** | Mantener varias partidas abiertas; mostrar instancias distintas del mismo juego, la cuadrícula y otra pestaña que comparte una partida por ID. |
+| **8:00–9:45** | Mostrar las estadísticas de cada partida mientras continúa y el dashboard general; explicar los conteos de instancias y la separación Go/Scala. |
+| **9:45–11:15** | Explicar la arquitectura orientada a objetos, el SDK, las responsabilidades de las clases y los patrones Factory, Adapter y Observer. |
+| **11:15–12:30** | Mostrar el deployment Docker y la [ejecución aprobada de CI/CD](https://github.com/JusMH/gameconsole/actions/runs/44814482222), incluyendo su integración real. |
+| **12:30–13:00** | Resumir las limitaciones y concluir. |
 
-Preparar partidas avanzadas o editar esperas con transparencia; no alterar física,
-relojes ni resultados para simular una carrera completa. Las demos con analítica
-simulada no prueban Go/Scala y deben identificarse si se muestran.
+## Preparación de la grabación
 
-Mostrar Ajustes: blur libera entradas; suspensión por visibilidad y reanudación
-son locales. Pausa manual se conserva. Observador/Tomar control requiere Web Locks
-y no constituye autorización global. Al finalizar, revisar resultados en el historial
-sin fabricar otro cierre.
+- Comprobar previamente los controles, audio y visualización de las tres interfaces.
+- Preparar una partida que permita demostrar el progreso de Circuito sin simular resultados ni modificar las reglas.
+- Mostrar métricas reales; las cifras provisionales y finales deben distinguirse de las no disponibles.
+- Demostrar la concurrencia sin confundir una nueva vista de la misma partida con una instancia nueva.
+- No mostrar credenciales, notificaciones privadas ni información personal innecesaria.
+- Publicar el video con acceso verificable y colocar su enlace en [verificación y entrega](entrega.md).
 
-Antes de publicar: comprobar audio, privacidad, acceso al enlace, autores y duración.
-Guardar la URL/run/SHA de Actions solo si existen. Grabación y enlace definitivo
-permanecen pendientes en el [registro de entrega](entrega.md).
+El importador experimental puede mencionarse brevemente como extensión adicional, pero **no reemplaza la demostración de ninguno de los tres juegos obligatorios**.

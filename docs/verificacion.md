@@ -1,24 +1,43 @@
-# Registro histórico de verificación
+# Comprobaciones técnicas de GameConsole
 
-Este documento conserva las comprobaciones registradas el 18 de noviembre de 2026,
-anteriores al despliegue SDK. No certifica la revisión actual ni su pipeline.
-El estado vigente está en [entrega](entrega.md).
+La validación del proyecto combina pruebas automatizadas, una integración real y pruebas manuales de la interfaz.
 
-El registro de esa etapa consigna:
+## Automatización
 
-- 12 pruebas Node: reglas, opciones, aislamiento, fallos de Prolog, HTTP y Outbox.
-- 10 pruebas Prolog, incluida exploración de continuaciones legales de la estrategia.
-- Suite Go y go vet aprobados; detector de carreras aprobado en Linux Docker.
-- 146 pruebas Scala, incluido análisis agregado y consultas de partidas abiertas/cerradas.
-- Integración real de seis partidas concurrentes con eventos entregados y resultados válidos.
-- Recuperación del envío tras pausar/reanudar Go, manteniendo eventos pendientes en Node.
-- Construcción desde la carpeta del proyecto mediante una copia temporal sin tildes.
-- Revisión de biblioteca, Gato/Prolog y estadísticas reales en navegador.
+La [ejecución aprobada de GitHub Actions](https://github.com/JusMH/gameconsole/actions/runs/44814482222) incluye:
 
-También se consignó una CI inicial aprobada y la verificación de descargas de sbt
-con checksum. Este registro no incluye enlaces a esas ejecuciones; no deben usarse
-como sustituto de la CI del commit definitivo.
+- **342 pruebas Node aprobadas**, sin errores ni cancelaciones.
+- Pruebas de SWI-Prolog con las estrategias del juego Gato.
+- Construcción de los servicios Node, Go y Scala mediante Docker.
+- Verificación de creación de partidas, eventos entregados, métricas y dashboard mediante el ejecutor integrado.
+- Publicación del [artefacto de integración](https://github.com/JusMH/gameconsole/actions/runs/44814482222/artifacts/14669531219).
 
-Los archivos de evidencia se guardan fuera de Git en evidence/. La integración SDK
-posterior y el estado del PR se documentan por separado en [entrega](entrega.md).
-No se presupone persistencia de sesiones ni publicación del video.
+## Prueba local
+
+Con Docker instalado:
+
+```powershell
+node scripts/deploy.mjs
+docker compose -p gameconsole ps
+```
+
+Para ejecutar pruebas desde el repositorio:
+
+```powershell
+npm run check
+npm test
+```
+
+Con el sistema desplegado, sin otras partidas activas:
+
+```powershell
+npm run test:integration:sdk
+```
+
+La última orden genera `evidence/sdk-integration.json` y comprueba el recorrido entre GameConsole, Prolog, Go y Scala. Para detener el entorno: `node scripts/deploy.mjs --stop`.
+
+## Comprobación visual
+
+La demostración debe verificar los controles de Gato, Snake y Circuito; la ejecución de varias partidas simultáneas; los datos por juego; las estadísticas generales de GameStats y el historial de partidas.
+
+Las partidas y los eventos pendientes se conservan solo mientras permanecen activos los procesos correspondientes.
