@@ -43,6 +43,8 @@ node scripts/deploy.mjs --stop
 
 Ambos repositorios, GameConsole y GameStats, son públicos. Para ejecutar el entorno Docker no es necesario instalar Go, Scala ni Prolog en el equipo anfitrión.
 
+**Extensión demostrable:** el repositorio incluye un entorno adicional con importador de plugins en **http://127.0.0.1:3001/**. El profesor puede iniciarlo con `node scripts/deploy-importer.mjs`, generar el ejemplo `evidence/import-demo.game.zip` con `node scripts/package-import-demo.mjs` (Python 3 local) e importarlo desde Biblioteca. Esto permite verificar nuevas sesiones, eventos Go y métricas Scala para un plugin instalado después del despliegue. La demostración y los pasos completos están en el [README](../README.md#importador-de-videojuegos-extensión-adicional) y en la [referencia técnica](sdk-v1/phase-3i2-plugin-importer.md). El paquete de Wall Defender no se distribuye en este repositorio.
+
 Las instrucciones de uso, verificación rápida, solución de problemas y pruebas locales están en el [README](../README.md); la justificación técnica se encuentra en [arquitectura](arquitectura.md) e [integración](integracion.md).
 
 ## Demostración en video

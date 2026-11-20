@@ -1,7 +1,6 @@
-# Fase 3I.2 — Importador experimental de paquetes
+# Importador de paquetes de videojuegos — referencia técnica
 
-Rama experiment/live-plugin-import, base 482e278e8febdbf36fe22adcf51e69d6bd7ea784.
-Referencia técnica del entorno experimental. El equipo comprobó manualmente el
+Referencia técnica del entorno adicional de importación. Para comenzar con un ejemplo incluido, seguir las [instrucciones de instalación y prueba](../../README.md#importador-de-videojuegos-extensión-adicional). El equipo comprobó manualmente el
 despliegue y la importación real de Wall Defender: dos partidas independientes y
 métricas obtenidas de Go/Scala. Esta comprobación no certifica el pipeline académico
 del commit definitivo. El rollback ante un perfil inválido y la victoria después

@@ -15,6 +15,8 @@ La configuración de entrega contiene **exactamente tres juegos**:
 | **Snake** | Movimiento, comida, crecimiento y colisiones; tableros de 12, 20 o 28 casillas por lado. | Flechas, WASD o controles en pantalla. |
 | **Circuito** | Carrera de tres carriles con obstáculos, aceleración, frenado y tres vueltas. | A/D o izquierda/derecha para cambiar de carril; W/arriba para acelerar y S/abajo para frenar. |
 
+**También se incluye un importador de videojuegos mediante paquetes `.game.zip`.** Funciona en un entorno separado, accesible en **http://127.0.0.1:3001/**, con un ejemplo listo para empaquetar y probar. Véase [Cómo probar el importador](#importador-de-videojuegos-extensión-adicional). El entorno académico se abre en el puerto **3000** y presenta los tres juegos obligatorios.
+
 ## Requisitos
 
 - Git, **Node.js 22** y Docker Engine o Docker Desktop con contenedores Linux.
@@ -23,7 +25,7 @@ La configuración de entrega contiene **exactamente tres juegos**:
 
 Antes de comenzar, iniciar Docker Desktop o Docker Engine y comprobar que `node --version` y `docker compose version` funcionan. La versión principal de Node debe ser **22**.
 
-No es necesario instalar Go, Scala ni SWI-Prolog en el equipo anfitrión **para ejecutar la consola**: se incluyen en los contenedores. GameStats se prepara automáticamente desde su [repositorio público](https://github.com/JusMH/gamestats), utilizando la revisión indicada en `gamestats.lock.json`. Tanto GameConsole como GameStats son públicos y pueden clonarse sin credenciales de GitHub.
+No es necesario instalar Go, Scala ni SWI-Prolog en el equipo anfitrión **para ejecutar la consola**: se incluyen en los contenedores. GameStats se prepara automáticamente desde el repositorio y la revisión especificados en [`gamestats.lock.json`](gamestats.lock.json). Las fuentes son públicas y pueden clonarse sin credenciales de GitHub.
 
 ## Instalación y deployment
 
@@ -83,6 +85,55 @@ Una partida también puede abrirse en otra pestaña mediante `/?match=<id>`; se 
 
 En Snake y Circuito, **Jugar / Pausa / Continuar** controla la actividad del cliente. Las preferencias de suspensión al ocultar la página están disponibles en **Ajustes**. Los atajos **Ctrl+Alt+J/K** permiten cambiar el juego enfocado, si el navegador no los reserva.
 
+## Importador de videojuegos (extensión adicional)
+
+Además de los tres videojuegos exigidos para el proyecto, se implementó un **importador de plugins**. Permite instalar un nuevo juego web junto con sus reglas y perfil de estadísticas, siempre que el paquete cumpla el contrato común del SDK. GameConsole registra el plugin, Go recibe sus eventos v1 y Scala analiza los resultados según el perfil aportado. La consola no necesita conocer previamente las reglas del juego.
+
+Este componente **sí está incluido y es ejecutable**. Se despliega por separado para no alterar el catálogo académico:
+
+| Entorno | Dirección | Qué permite |
+| --- | --- | --- |
+| Académico | **http://127.0.0.1:3000/** | Gato, Snake y Circuito; importación deshabilitada. |
+| Importador | **http://127.0.0.1:3001/** | Los tres juegos iniciales y la opción **Importar juego**. |
+
+### Instalación y prueba paso a paso
+
+Desde la raíz de GameConsole, con Docker iniciado:
+
+```powershell
+node scripts/deploy-importer.mjs
+```
+
+Esperar a que los servicios estén saludables y abrir **http://127.0.0.1:3001/**. El importador experimental necesita un navegador local y no debe exponerse en una red pública.
+
+Para probarlo **sin descargar un juego externo**, el proyecto incluye el ejemplo **Contador importado** en `test/fixtures/import-demo/`. Preparar su ZIP ejecutando (requiere **Python 3 local**, incluido `py -3` en Windows):
+
+```powershell
+node scripts/package-import-demo.mjs
+```
+
+El script genera `evidence/import-demo.game.zip`. Después, en la consola del **puerto 3001**:
+
+1. Seleccionar **Biblioteca → Importar juego**.
+2. Elegir `evidence/import-demo.game.zip`.
+3. Revisar la vista previa y **confirmar la instalación de confianza**.
+4. Comprobar que aparece **Contador importado** en Biblioteca; crear una o dos partidas.
+5. Pulsar **Incrementar** en una de ellas y consultar las estadísticas: el evento `COUNTER_INCREMENTED` se entrega a Go y el perfil del plugin permite a Scala calcular **Incrementos confirmados**. Completar la partida para ver el resultado final.
+
+Este ejemplo demuestra que los videojuegos, el registro de sesiones y los perfiles analíticos se pueden extender **sin añadir condiciones específicas del juego a GameConsole ni sustituir el cálculo de GameStats**.
+
+También se probó una adaptación web de **Wall Defender**, originalmente hecha en Java. Su paquete `.game.zip` **no está incluido en este repositorio**; para importarlo se necesita disponer del ZIP preparado por el equipo. El importador no ejecuta JAR directamente.
+
+Los plugins y perfiles importados persisten en `.local/importer/` y se recuperan después de reiniciar el entorno; **las partidas no persisten**. Para detenerlo:
+
+```powershell
+node scripts/deploy-importer.mjs --stop
+```
+
+El apagado no borra los paquetes instalados. Para repetir una instalación desde cero, detener primero el importador y apartar o respaldar la carpeta `.local/importer/` antes de volver a iniciarlo. No es necesario limpiar volúmenes ni eliminar imágenes Docker.
+
+**Contrato y límites:** [documentación del importador](docs/sdk-v1/phase-3i2-plugin-importer.md). Solo deben instalarse paquetes de código confiable, ya que los módulos Node se ejecutan con los permisos del proceso.
+
 ## Pruebas y CI/CD
 
 Las pruebas automatizadas son **opcionales para utilizar la consola**. Para evaluar los tres juegos en el navegador es suficiente con seguir el deployment y la verificación rápida.
@@ -112,7 +163,7 @@ El pipeline de GitHub Actions ejecuta las pruebas, construye Docker y realiza un
 | --- | --- |
 | `docker` no se reconoce o no conecta con el servicio. | Iniciar Docker Desktop o Docker Engine y ejecutar `docker info` y `docker compose version`. En Windows, utilizar contenedores Linux. |
 | Error de puerto en uso durante el despliegue. | Cerrar el servicio que utiliza ese puerto o cambiar los puertos publicados antes del arranque. |
-| No se puede preparar GameStats. | Comprobar Internet y el acceso al [repositorio público de GameStats](https://github.com/JusMH/gamestats). El script descarga automáticamente la revisión requerida. |
+| No se puede preparar GameStats. | Comprobar la conexión a Internet y el acceso al repositorio indicado en [`gamestats.lock.json`](gamestats.lock.json). El script descarga automáticamente la revisión requerida. |
 | No aparecen estadísticas inmediatamente. | Generar eventos jugando, esperar la consulta periódica y confirmar que los tres servicios continúan saludables. |
 | Alguna prueba local indica que falta Prolog o Python. | Instalar las dependencias de pruebas indicadas arriba, o utilizar la demostración Docker y la evidencia de GitHub Actions. |
 
@@ -140,13 +191,12 @@ La consola separa los módulos de juego, las sesiones, el envío de eventos y la
 
 Las partidas y los eventos aún pendientes residen en memoria: no sobreviven al reinicio de sus respectivos procesos. Tampoco se implementan cuentas ni control global de jugadores entre equipos.
 
-Existe un **importador experimental opcional** para paquetes confiables `.game.zip`, separado del deployment académico de tres juegos. Su uso no es necesario para ejecutar ni evaluar los requisitos del proyecto.
+El **importador de videojuegos** cuenta con su propio procedimiento de instalación y demostración, explicado arriba. Está separado del deployment académico de tres juegos y utiliza paquetes confiables `.game.zip`.
 
 ## Documentación
 
 - [Arquitectura y decisiones técnicas](docs/arquitectura.md)
 - [Eventos, servicios y consultas de GameStats](docs/integracion.md)
 - [Verificación del proyecto](docs/entrega.md)
-- [Guion de demostración](docs/video.md)
 - [Contrato del SDK (consulta complementaria)](docs/sdk-v1/README.md)
-- [Repositorio de GameStats](https://github.com/JusMH/gamestats)
+- [Versión de GameStats utilizada](gamestats.lock.json)

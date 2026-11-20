@@ -10,7 +10,7 @@ La [ejecución aprobada de GitHub Actions](https://github.com/franncd26/gamecons
 - Pruebas de SWI-Prolog con las estrategias del juego Gato.
 - Construcción de los servicios Node, Go y Scala mediante Docker.
 - Verificación de creación de partidas, eventos entregados, métricas y dashboard mediante el ejecutor integrado.
-- Publicación del [artefacto de integración](https://github.com/franncd26/gameconsole/actions/runs/44819352482/artifacts/14669531219).
+- Publicación del [artefacto de integración](https://github.com/franncd26/gameconsole/actions/runs/44819352482/artifacts/14672010286).
 
 ## Prueba local
 
