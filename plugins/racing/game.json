@@ -7,7 +7,7 @@
   "description": "Carrera de tres vueltas con carriles y obstáculos",
   "category": "racing",
   "entrypoints": { "server": "server/index.mjs", "web": "web/index.html" },
-  "capabilities": { "pause": false, "resume": false, "multipleInstances": false, "ai": false },
+  "capabilities": { "pause": false, "resume": false, "multipleInstances": true, "ai": false },
   "players": { "min": 1, "max": 1 },
   "analytics": { "profile": "analytics/profile.json" },
   "options": []

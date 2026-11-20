@@ -53,7 +53,7 @@ test('multiple independent iframes remain identical while selection, stats, list
   h.app.reconcile([...h.stored.values()]); await h.app.dashboard.refresh(); await h.app.results.refresh(); await h.app.loadCatalog(); await h.app.select('a');
   assert.deepEqual([...h.app.workspace.records.values()].map(r => r.frame), frames); assert.equal(h.bridge.unmounts.length, 0);
   const record = h.app.workspace.records.get('a'); h.app.workspace.unmount('a'); await h.app.select('a'); assert.notEqual(record.frame, frames[0]); assert.equal(h.bridge.unmounts.length, 1);
-  const mounted = record.frame; record.card.children[4].children.at(-1).fire('click'); await settle();
+  const mounted = record.frame; record.remount.fire('click'); await settle();
   assert.notEqual(record.frame, mounted, 'explicit remount always creates a fresh iframe, including a retired channel'); assert.equal(h.bridge.unmounts.length, 2);
 });
 test('workspace supports N arbitrary plugin views, and multipleInstances true leaves creation available', () => {

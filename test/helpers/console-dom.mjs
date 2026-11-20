@@ -10,7 +10,7 @@ export class Node extends Target {
     this.classList = { toggle: (key, on) => on ? this.classes.add(key) : this.classes.delete(key) };
     this.value = ''; this.checked = false; this.disabled = false; this.hidden = false;
   }
-  append(...nodes) { for (const n of nodes) { n.parentNode = this; this.children.push(n); } }
+  append(...nodes) { for (const n of nodes) { n.remove(); n.parentNode = this; this.children.push(n); } }
   replaceChildren(...nodes) { for (const c of this.children) c.parentNode = null; this.children = []; this._text = ''; this.append(...nodes); }
   remove() { if (this.parentNode) this.parentNode.children = this.parentNode.children.filter(n => n !== this); this.parentNode = null; }
   set textContent(value) { this.replaceChildren(); this._text = String(value); }
@@ -43,6 +43,7 @@ export class Clock {
   setTimeout(fn, delay) { const id = ++this.id; this.jobs.set(id, { fn, delay }); return id; }
   clearTimeout(id) { this.jobs.delete(id); }
   async next() { const value = this.jobs.entries().next().value; if (value) { this.jobs.delete(value[0]); value[1].fn(); } await settle(); }
+  async runDelay(delay) { for (const [id, job] of [...this.jobs]) if (job.delay === delay) { this.jobs.delete(id); job.fn(); } await settle(); }
 }
 export async function settle() { for (let i = 0; i < 30; i++) await Promise.resolve(); }
 export function deferred() { let resolve, reject; const promise = new Promise((a, b) => { resolve = a; reject = b; }); return { promise, resolve, reject }; }

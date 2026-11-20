@@ -7,7 +7,7 @@
   "description": "Gato contra inteligencia artificial en Prolog",
   "category": "strategy",
   "entrypoints": { "server": "server/index.mjs", "web": "web/index.html" },
-  "capabilities": { "pause": false, "resume": false, "multipleInstances": false, "ai": true },
+  "capabilities": { "pause": false, "resume": false, "multipleInstances": true, "ai": true },
   "players": { "min": 2, "max": 2 },
   "analytics": { "profile": "analytics/profile.json" },
   "options": [

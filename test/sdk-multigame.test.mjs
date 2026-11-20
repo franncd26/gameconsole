@@ -32,7 +32,11 @@ test('one real bootstrap/manager/Outbox runs all three packages together and iso
   assert.equal(manager.size, 3); assert.equal(app.matches.size, 0);
   assert.ok(matches.every((s) => s.state === 'running')); assert.equal(new Set(matches.map((s) => s.matchId)).size, 3);
   const [gato, snake, racing] = matches;
-  for (const id of ids) await assert.rejects(manager.create(id), { code: 'MULTIPLE_INSTANCES_DISABLED' });
+  for (const id of ids) {
+    const additional = await manager.create(id);
+    assert.ok(!matches.some(s => s.matchId === additional.matchId));
+    await manager.discard(additional.matchId);
+  }
   const [moved, advanced] = await Promise.all([
     manager.dispatch(snake.matchId, action('TICK', { direction: 'right' }, 'parallel')),
     manager.dispatch(racing.matchId, action('STEP', step, 'parallel')),
@@ -90,7 +94,8 @@ test('generic HTTP catalog/create/snapshot/actions/replay/close work for three a
   assert.deepEqual((await request(`matches/${racing.matchId}/actions`, drive)).body, racingResult.body);
   assert.equal((await request('matches')).body.length, 3);
   assert.equal((await request(`matches/${snake.matchId}`)).body.data.body[0].x, snake.data.body[0].x + 1);
-  for (const id of ids) assert.equal((await request('matches', { gameId: id })).status, 409);
+  for (const match of matches) assert.equal((await request(`matches/${match.matchId}`)).body.matchId, match.matchId);
+  assert.equal((await request('matches')).body.length, 3, 'reading existing identities never creates another session');
   assert.equal((await request(`matches/${snake.matchId}/finish`, { reason: 'abandoned' })).body.state, 'finished');
   assert.equal((await request(`matches/${racing.matchId}`)).body.state, 'running');
   assert.equal((await request(`matches/${gato.matchId}`)).body.state, 'running');

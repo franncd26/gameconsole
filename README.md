@@ -9,6 +9,11 @@ Go recibe eventos; Scala calcula estadísticas. El navegador no calcula métrica
 ligeras; no se certifican todavía las nuevas imágenes, Compose o GitHub Actions.
 Consultar [estado y detalles de 3F](docs/sdk-v1/phase-3f-deployment.md).
 
+La [Fase 3G](docs/sdk-v1/phase-3g-multiinstance-experience.md) habilita varias
+partidas independientes de cada juego y reorganiza la consola en biblioteca,
+área de juego enfocada/cuadrícula e historial. Verificada con pruebas ligeras;
+su revisión visual y las estadísticas contra servicios reales quedan a cargo del equipo.
+
 ## Requisitos y arranque reproducible
 
 Git, Node.js 22 y Docker Engine/Desktop con contenedores Linux y Compose v2
@@ -79,11 +84,12 @@ HTTPS canónico, sin ruta, query ni credenciales. No se confía en Forwarded del
 2. Crear la partida. Gato utiliza clic o Tab/Enter para colocar X; Prolog decide O.
    Snake usa Jugar/continuar y flechas/WASD o botones. Circuito usa Activar controles,
    mantiene acelerar/frenar y cambia de carril con flechas/A-D o botones.
-3. Crear otro juego: los tres tipos pueden permanecer abiertos simultáneamente.
-   Los manifiestos actuales permiten **una partida sin finalizar por tipo**.
-   Para iniciar otra del mismo juego, finalizar la existente.
-4. Seleccionar un panel conserva los otros iframe. Desmontar solo retira su vista;
-   Remontar consulta el estado y crea un iframe nuevo.
+3. Crear más partidas, incluso del mismo juego: los tres manifiestos permiten
+   **múltiples instancias independientes**. Cuatro Circuitos tienen cuatro UUID,
+   tableros/estados y versiones propios; crear otra partida no sustituye la anterior.
+4. En Partidas, elegir una en la lista compacta o activar Cuadrícula para ver varias.
+   Seleccionar o cambiar de sección conserva los iframe. Diagnóstico permite ocultar
+   o restablecer una vista; restablecer crea un iframe nuevo para la misma partida.
 5. Nueva pestaña abre `/?match=<id>`: comparte la misma partida y UUID;
    **no crea una instancia adicional**. Puede haber conflictos de versión entre
    clientes. Recargar recupera las partidas del proceso, sin persistencia durable.
@@ -94,6 +100,12 @@ HTTPS canónico, sin ruta, query ni credenciales. No se confía en Forwarded del
 Las entradas automáticas de Snake/Circuito se suspenden al perder foco; continuar
 resincroniza antes de emitir pasos. Esto no es pause/resume oficial del SDK.
 Finalizar es administrativo; no fabrica victoria ni carrera completada.
+Al confirmarse finished, la vista muestra brevemente el final y libera su canal
+tras 1,8 s. La partida queda en el historial plegable con sus resultados; consultarla
+no monta otro iframe ni emite otro cierre. Al recargar se prefieren partidas activas.
+Los nombres numerados y UUID abreviados son presentación; el identificador completo
+y la información de entrega están en Diagnóstico. Una partida finalizada sigue
+ocupando memoria del SDK hasta reiniciar el proceso.
 
 ## Confirmado, entregado y analizado
 

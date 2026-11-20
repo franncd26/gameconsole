@@ -68,7 +68,7 @@ test('authentic relocated package discovers/bootstraps/initializes with no Prolo
   const { registry, errors } = await discoverPlugins(root);
   assert.deepEqual(errors, []);
   const m = registry.get('tic-tac-toe').manifest;
-  assert.equal(m.version, '1.1.0'); assert.equal(m.capabilities.multipleInstances, false);
+  assert.equal(m.version, '1.1.0'); assert.equal(m.capabilities.multipleInstances, true);
   const app = createApp({ sdk: await prepareSDK({ pluginsDirectory: root, trustedIds: ['tic-tac-toe'] }),
     statsURL: 'http://go.test', statsFetcher: async () => new Response('{}', { status: 201 }) });
   t.after(() => app.outbox.stop());
@@ -232,15 +232,17 @@ for (const scenario of [
   assert.equal(events.filter((e) => e.type === 'MATCH_FINISHED').length, 1);
 });
 
-test('single-active-instance manifest policy and administrative abandonment preserve domain data', async (t) => {
+test('multiple independent instances and administrative abandonment preserve domain data', async (t) => {
   const { manager, match, dispatch, events } = await setup(t);
-  await assert.rejects(manager.create('tic-tac-toe'), { code: 'MULTIPLE_INSTANCES_DISABLED' });
+  const other = await manager.create('tic-tac-toe');
+  assert.notEqual(other.matchId, match.matchId); assert.deepEqual(other.data.board, Array(9).fill(''));
   await dispatch('PLACE_MARK', { index: 0 });
   const before = await manager.getSnapshot(match.matchId);
   const abandoned = await manager.finish(match.matchId, { reason: 'abandoned' });
   assert.equal(abandoned.state, 'finished'); assert.deepEqual(abandoned.data, before.data);
   assert.equal(abandoned.data.result, null, 'administrative reason is not a fabricated game result');
   assert.equal(events.at(-1).data.reason, 'abandoned');
+  assert.deepEqual((await manager.getSnapshot(other.matchId)).data.board, Array(9).fill(''));
   const next = await manager.create('tic-tac-toe');
   assert.notEqual(next.matchId, match.matchId); assert.deepEqual(next.data.board, Array(9).fill(''));
 });
@@ -302,7 +304,8 @@ test('HTTP creates and plays the relocated authentic Gato package through generi
   const created = await post('matches', { gameId: 'tic-tac-toe' });
   assert.equal(created.status, 201); assert.equal(created.body.state, 'running'); assert.equal(control.calls.length, 0);
   const route = `matches/${created.body.matchId}`;
-  assert.equal((await post('matches', { gameId: 'tic-tac-toe' })).status, 409);
+  const second = await post('matches', { gameId: 'tic-tac-toe' });
+  assert.equal(second.status, 201); assert.notEqual(second.body.matchId, created.body.matchId);
   const input = { requestId: 'http-x', type: 'PLACE_MARK', payload: { index: 0 }, expectedVersion: 0 };
   const result = await post(route + '/actions', input);
   assert.equal(result.status, 200); assert.equal(result.body.snapshot.version, 2);
@@ -310,6 +313,7 @@ test('HTTP creates and plays the relocated authentic Gato package through generi
   assert.equal((await post(route + '/finish', { reason: 'abandoned' })).body.state, 'finished');
   assert.equal((await post(route + '/actions', { ...input, requestId: 'new-action' })).status, 409);
   await app.outbox.flush(1000);
-  assert.deepEqual(delivered.map((e) => e.type), ['MATCH_STARTED', 'MOVE_PLACED', 'AI_DECISION', 'MOVE_PLACED', 'MATCH_FINISHED']);
+  assert.deepEqual(delivered.filter(e => e.matchId === created.body.matchId).map((e) => e.type), ['MATCH_STARTED', 'MOVE_PLACED', 'AI_DECISION', 'MOVE_PLACED', 'MATCH_FINISHED']);
+  assert.deepEqual(delivered.filter(e => e.matchId === second.body.matchId).map(e => e.type), ['MATCH_STARTED']);
   assert.deepEqual(delivered[0].data, { symbols: { human: 'X', prolog: 'O' }, difficulty: 'hard', players: ['human', 'prolog'] });
 });

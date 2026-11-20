@@ -25,7 +25,7 @@ function appleAhead() {
 test('Snake authentic package manifest, initialization, options/participants and audited profile', async (t) => {
   const h = await packageHarness(t, 'snake');
   const manifest = h.registry.get('snake').manifest;
-  assert.equal(manifest.version, '1.1.0'); assert.equal(manifest.capabilities.multipleInstances, false);
+  assert.equal(manifest.version, '1.1.0'); assert.equal(manifest.capabilities.multipleInstances, true);
   for (const size of [12, 20, 28]) {
     const s = await h.start({ size });
     assert.equal(s.data.size, size); assert.equal(s.data.body.length, 3); assert.equal(s.data.direction, 'right');

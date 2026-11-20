@@ -20,7 +20,7 @@ const initial = () => new RacingRules().initial(1000);
 
 test('Circuito authentic manifest/init/options/participants and pinned portable profile', async (t) => {
   const h = await packageHarness(t, 'racing'), s = await h.start();
-  assert.equal(h.registry.get('racing').manifest.capabilities.multipleInstances, false);
+  assert.equal(h.registry.get('racing').manifest.capabilities.multipleInstances, true);
   assert.equal(s.data.lap, 0); assert.equal(s.data.totalLaps, 3); assert.equal(s.data.lapLength, 1200);
   assert.equal(s.data.lane, 1); assert.equal(s.data.speed, 0); assert.equal(s.data.result, null);
   assert.deepEqual(s.data.obstacles, initial().obstacles); assert.deepEqual(s.data.hit, []);

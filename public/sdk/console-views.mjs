@@ -6,6 +6,8 @@ export function element(document, tag, className = '', text) {
   if (text !== undefined) node.textContent = String(text);
   return node;
 }
+export const shortId = id => id.length > 16 ? id.slice(0, 8) + '…' + id.slice(-4) : id;
+const lifecycle = { running: 'En juego', closing: 'Cerrando', finished: 'Finalizada' };
 function button(document, text, action) {
   const node = element(document, 'button', '', text); node.type = 'button';
   node.addEventListener('click', action); return node;
@@ -40,7 +42,8 @@ export class CatalogView {
     for (const plugin of catalog) {
       const d = this.document, card = element(d, 'article', 'catalog-card'), form = element(d, 'form');
       card.append(element(d, 'p', 'eyebrow', plugin.category), element(d, 'h3', '', plugin.name), element(d, 'p', 'muted', plugin.description));
-      card.append(element(d, 'p', 'metadata', plugin.players.min + '–' + plugin.players.max + ' participantes · ' + (plugin.capabilities.multipleInstances ? 'Múltiples instancias' : 'Una partida sin finalizar por tipo')));
+      const players = plugin.players.min === plugin.players.max ? String(plugin.players.max) : plugin.players.min + '–' + plugin.players.max;
+      card.append(element(d, 'p', 'metadata', players + ' participantes' + (plugin.capabilities.ai ? ' · Rival de IA' : '') + ' · ' + (plugin.capabilities.multipleInstances ? 'Puedes crear varias partidas' : 'Una partida en juego')));
       const controls = new Map();
       for (const definition of plugin.options) {
         const label = element(d, 'label', 'option', definition.label), input = optionControl(d, definition);
@@ -72,22 +75,30 @@ export class CatalogView {
 }
 
 export class MatchWorkspace {
-  constructor({ document, root, bridge, onSelect, onFinish, onError }) {
-    Object.assign(this, { document, root, bridge, onSelect, onFinish, onError }); this.records = new Map();
+  constructor({ document, root, historyRoot = root, empty, bridge, onSelect, onFinish, onError, clock = globalThis }) {
+    Object.assign(this, { document, root, historyRoot, empty, bridge, onSelect, onFinish, onError, clock });
+    this.records = new Map(); this.mode = 'focus'; this.selectedId = null;
   }
   upsert(snapshot, name) {
     const record = this.records.get(snapshot.matchId); if (!record) return;
-    if (snapshot.gameId !== record.snapshot.gameId || snapshot.version < record.snapshot.version) return;
+    const rank = { running: 0, closing: 1, finished: 2 };
+    if (snapshot.gameId !== record.snapshot.gameId || snapshot.version < record.snapshot.version
+      || (snapshot.version === record.snapshot.version && rank[snapshot.state] < rank[record.snapshot.state])) return;
     const changed = record.snapshot.state !== snapshot.state;
     record.snapshot = structuredClone(snapshot);
     record.title.textContent = name || snapshot.gameId;
+    record.badge.textContent = lifecycle[snapshot.state];
     record.details.textContent = snapshot.gameId + ' · ' + snapshot.matchId + ' · ' + snapshot.state + ' · v' + snapshot.version;
     const delivery = snapshot.delivery;
     record.delivery.textContent = delivery ? 'Outbox: ' + delivery.pending + ' pendientes · ' + delivery.delivered + ' entregados' + (delivery.error ? ' · entrega con error' : '') : 'Entrega pendiente de consulta';
     record.finish.disabled = snapshot.state === 'finished' || record.finishing;
     record.finish.textContent = snapshot.state === 'closing' ? 'Reintentar cierre' : 'Finalizar';
+    record.remount.disabled = snapshot.state === 'finished';
+    record.choose.textContent = snapshot.state === 'finished' ? 'Ver resultados' : 'Elegir';
+    record.official.textContent = JSON.stringify(snapshot, null, 2);
     if (changed) { record.refreshRevision++; record.needsRefresh = true; }
     if (record.needsRefresh && record.frame) void this.refresh(record);
+    if (snapshot.state === 'finished') this.complete(record);
   }
   async refresh(record) {
     if (record.refreshing || !record.frame) return;
@@ -115,31 +126,70 @@ export class MatchWorkspace {
     if (!record) {
       const d = this.document, card = element(d, 'article', 'match-card'), title = element(d, 'h3'), details = element(d, 'p', 'identity');
       const delivery = element(d, 'p', 'metadata'), channel = element(d, 'p', 'metadata', 'Esperando Bridge'), tools = element(d, 'div', 'tools'), container = element(d, 'div', 'frame-container');
-      record = { card, title, details, delivery, channel, container, frame: null, snapshot: structuredClone(snapshot), finishing: false,
-        generation: 0, refreshRevision: 0, refreshing: false, needsRefresh: false };
+      const badge = element(d, 'span', 'badge'), banner = element(d, 'p', 'terminal-banner'), official = element(d, 'pre');
+      const diagnostics = element(d, 'details', 'diagnostics'); diagnostics.append(element(d, 'summary', '', 'Diagnóstico'), details, delivery, channel, official);
+      record = { card, title, details, delivery, channel, container, badge, banner, official, tools, frame: null, snapshot: structuredClone(snapshot), finishing: false,
+        generation: 0, refreshRevision: 0, refreshing: false, needsRefresh: false, retired: false, terminalTimer: null };
       record.finish = button(d, 'Finalizar', () => void this.onFinish(snapshot.matchId));
       const newTab = element(d, 'a', 'button', 'Nueva pestaña'); newTab.href = '/?match=' + encodeURIComponent(snapshot.matchId); newTab.target = '_blank'; newTab.rel = 'noopener';
-      tools.append(button(d, 'Seleccionar', () => this.onSelect(snapshot.matchId)), newTab, record.finish,
-        button(d, 'Desmontar vista', () => this.unmount(snapshot.matchId)),
-        button(d, 'Remontar vista', () => { this.unmount(snapshot.matchId); void this.onSelect(snapshot.matchId); }));
-      card.append(title, details, delivery, channel, tools, container); this.root.append(card); this.records.set(snapshot.matchId, record);
+      newTab.title = 'Abre esta misma partida en otra pestaña, sin crear otra instancia';
+      record.choose = button(d, 'Elegir', () => this.onSelect(snapshot.matchId));
+      record.remount = button(d, 'Restablecer vista', () => { if (record.snapshot.state !== 'finished') { this.unmount(snapshot.matchId); void this.onSelect(snapshot.matchId); } });
+      const detach = button(d, 'Ocultar vista', () => record.snapshot.state === 'finished' ? this.retire(record) : this.unmount(snapshot.matchId));
+      tools.append(record.choose, newTab, record.finish);
+      diagnostics.append(detach, record.remount);
+      card.append(title, badge, tools, banner, container, diagnostics); this.root.append(card); this.records.set(snapshot.matchId, record);
     }
     this.upsert(snapshot, name);
-    if (!record.frame) {
+    if (!record.frame && record.snapshot.state !== 'finished') {
       try { record.frame = this.bridge.mount(record.container, record.snapshot); record.needsRefresh = false; }
       catch { record.channel.textContent = 'No se pudo montar. Revisa el límite de 32 canales del Bridge y desmonta una vista.'; }
     }
     this.select(snapshot.matchId); return record;
   }
-  select(id) { for (const [key, record] of this.records) record.card.classList.toggle('selected', key === id); }
+  setMode(mode) {
+    if (!['focus', 'grid'].includes(mode)) return;
+    this.mode = mode; this.root.classList.toggle('grid', mode === 'grid'); this.visibility();
+  }
+  select(id) { this.selectedId = id; this.visibility(); }
+  visibility() {
+    let visible = false;
+    for (const [id, record] of this.records) {
+      record.card.classList.toggle('selected', id === this.selectedId);
+      record.card.hidden = record.retired ? id !== this.selectedId : this.mode === 'focus' && id !== this.selectedId;
+      if (!record.retired && !record.card.hidden) visible = true;
+    }
+    if (this.empty) this.empty.hidden = visible;
+  }
+  complete(record) {
+    record.banner.textContent = 'Partida finalizada. Sus resultados permanecen disponibles en el historial.';
+    if (record.retired || record.terminalTimer !== null) return;
+    if (!record.frame) { this.retire(record); return; }
+    // Briefly keep the plugin's own terminal screen. Never finish the SDK a second time.
+    const generation = record.generation;
+    record.terminalTimer = this.clock.setTimeout(() => {
+      record.terminalTimer = null;
+      if (this.records.get(record.snapshot.matchId) === record && record.generation === generation) this.retire(record);
+    }, 1800);
+  }
+  retire(record) {
+    if (this.records.get(record.snapshot.matchId) !== record) return;
+    this.unmount(record.snapshot.matchId); record.retired = true;
+    record.channel.textContent = 'Canal liberado. La sesión y sus estadísticas se conservan en el servidor.';
+    // Reparent only after releasing/removing the iframe; live frames never change parent.
+    if (record.card.parentNode !== this.historyRoot) this.historyRoot.append(record.card);
+    this.visibility();
+  }
   setFinishing(id, value) { const r = this.records.get(id); if (r) { r.finishing = value; r.finish.disabled = value || r.snapshot.state === 'finished'; } }
   status(event) {
-    const r = this.records.get(event.matchId); if (!r) return;
+    const r = this.records.get(event.matchId); if (!r || r.retired) return;
     r.channel.textContent = event.state === 'initialized' ? 'Bridge conectado' : event.state === 'error' ? 'Bridge requiere atención; consulta el estado o remonta la vista.' : 'Bridge: ' + event.state;
     if (event.state === 'initialized' && r.needsRefresh) void this.refresh(r);
   }
   unmount(id) {
     const r = this.records.get(id); if (!r) return;
+    if (r.terminalTimer !== null) this.clock.clearTimeout(r.terminalTimer);
+    r.terminalTimer = null;
     const frame = r.frame;
     r.frame = null; r.generation++; r.refreshing = false; r.needsRefresh = false;
     if (frame) { this.bridge.unmount(frame); r.channel.textContent = 'Vista desmontada; la partida permanece en el servidor.'; }
@@ -148,7 +198,7 @@ export class MatchWorkspace {
     const r = this.records.get(id); if (!r) return;
     this.unmount(id); this.records.delete(id); r.card.remove();
   }
-  dispose() { for (const id of this.records.keys()) this.unmount(id); this.records.clear(); this.root.replaceChildren(); }
+  dispose() { for (const id of this.records.keys()) this.unmount(id); this.records.clear(); this.root.replaceChildren(); if (this.historyRoot !== this.root) this.historyRoot.replaceChildren(); }
 }
 
 export function displayValue(value) { return value === null ? 'Sin dato (null)' : value === undefined ? 'Sin datos' : typeof value === 'object' ? JSON.stringify(value, null, 2) : String(value); }
@@ -164,13 +214,16 @@ export class StatsPanel {
     for (const row of rows || []) {
       const d = this.document, item = element(d, 'article', 'metric');
       item.append(element(d, 'h4', '', row.label || row.id), element(d, 'pre', 'metric-value', displayValue(pattern ? row.count : row.value)));
+      item.append(element(d, 'p', 'metadata', [row.unit, { provisional: 'En curso', final: 'Final', unavailable: 'No disponible', invalid: 'Dato inválido' }[row.status] || row.status].filter(Boolean).join(' · ')));
+      const info = element(d, 'details', 'diagnostics'); info.append(element(d, 'summary', '', 'Procedencia y detalles'));
       const metadata = [row.scope, row.subjectId, row.unit, row.status].filter(v => v !== undefined).join(' · ');
-      item.append(element(d, 'p', 'metadata', metadata));
+      info.append(element(d, 'p', 'metadata', metadata));
       if (row.reason) item.append(element(d, 'p', 'warning', 'Motivo: ' + row.reason));
-      if (row.basis?.eventCount !== undefined) item.append(element(d, 'p', 'metadata', 'Base: ' + row.basis.eventCount + ' eventos'));
-      if (row.source) item.append(element(d, 'pre', 'metadata', displayValue(row.source)));
+      if (row.basis?.eventCount !== undefined) info.append(element(d, 'p', 'metadata', 'Base: ' + row.basis.eventCount + ' eventos'));
+      if (row.source) info.append(element(d, 'pre', 'metadata', displayValue(row.source)));
       if (row.invalidSamples > 0) item.append(element(d, 'p', 'warning', 'Total parcial: ' + row.invalidSamples + ' muestras inválidas/no disponibles'));
-      if (pattern && row.occurrences) item.append(element(d, 'pre', 'metadata', displayValue(row.occurrences)));
+      if (pattern && row.occurrences) info.append(element(d, 'pre', 'metadata', displayValue(row.occurrences)));
+      item.append(info);
       root.append(item);
     }
   }

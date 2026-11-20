@@ -1,6 +1,6 @@
 import { ConsoleAPI, ConsoleError } from './console-api.mjs';
 import { PollResource } from './console-stats.mjs';
-import { CatalogView, MatchWorkspace, StatsPanel, element } from './console-views.mjs';
+import { CatalogView, MatchWorkspace, StatsPanel, element, shortId } from './console-views.mjs';
 import { HostBridge } from './bridge/host-bridge.mjs';
 
 export class ConsoleApp {
@@ -10,9 +10,11 @@ export class ConsoleApp {
     this.creating = new Set(); this.finishing = new Set(); this.selectedId = null;
     this.selection = 0; this.disposed = false;
     this.notice = document.getElementById('notice'); this.list = document.getElementById('match-list');
+    this.historyList = document.getElementById('history-list');
     this.bridge = bridge || new HostBridge({ window, onStatus: event => this.workspace?.status(event) });
     const onError = error => this.error(error);
     this.workspace = new MatchWorkspace({ document, root: document.getElementById('workspace'), bridge: this.bridge,
+      historyRoot: document.getElementById('history-workspace'), empty: document.getElementById('workspace-empty'), clock,
       onSelect: id => void this.select(id), onFinish: id => void this.finish(id), onError });
     this.library = new CatalogView({ document, root: document.getElementById('catalog'), onError,
       onCreate: (id, options) => this.create(id, options), onOpen: id => this.select(id), onFinish: id => this.finish(id) });
@@ -25,7 +27,7 @@ export class ConsoleApp {
     this.unsubscribers = [this.results.subscribe(s => this.stats.renderResults(s)), this.dashboard.subscribe(s => this.stats.renderDashboard(s)),
       this.sessions.subscribe(s => {
         if (s.status === 'updated') this.reconcile(s.data);
-        document.getElementById('sessions-status').textContent = s.status === 'failed' ? 'Listado SDK no disponible; vuelve a actualizar.' : s.lastSuccess ? 'Partidas del proceso SDK · consulta ' + s.lastSuccess : 'Consultando partidas del servidor…';
+        document.getElementById('sessions-status').textContent = s.status === 'failed' ? 'No pudimos actualizar tus partidas. Vuelve a intentarlo.' : s.lastSuccess ? 'Lista actualizada · ' + s.lastSuccess : 'Buscando tus partidas…';
       })];
     this.listeners = [];
     this.listen(document.getElementById('reload-catalog'), 'click', () => void this.loadCatalog());
@@ -33,6 +35,23 @@ export class ConsoleApp {
     this.listen(document.getElementById('reload-matches'), 'click', () => void this.sessions.refresh());
     this.listen(document, 'visibilitychange', () => { for (const resource of [this.results, this.dashboard, this.sessions]) resource.visibilityChanged(); });
     this.listen(window, 'pagehide', () => this.dispose());
+    for (const section of ['library', 'play', 'analytics']) this.listen(document.getElementById('nav-' + section), 'click', () => this.setSection(section));
+    for (const mode of ['focus', 'grid']) this.listen(document.getElementById('mode-' + mode), 'click', () => this.setMode(mode));
+    this.setSection('library'); this.setMode('focus');
+  }
+  setSection(section) {
+    for (const id of ['library', 'play', 'analytics']) {
+      this.document.getElementById(id).hidden = id !== section;
+      this.document.getElementById('nav-' + id).setAttribute('aria-pressed', String(id === section));
+    }
+  }
+  setMode(mode) {
+    this.workspace.setMode(mode);
+    for (const id of ['focus', 'grid']) this.document.getElementById('mode-' + id).setAttribute('aria-pressed', String(mode === id));
+  }
+  name(snapshot) {
+    const siblings = [...this.snapshots.values()].filter(s => s.gameId === snapshot.gameId);
+    return (this.catalog.get(snapshot.gameId)?.name || snapshot.gameId) + ' ' + (siblings.findIndex(s => s.matchId === snapshot.matchId) + 1);
   }
   listen(node, type, callback) { node.addEventListener(type, callback); this.listeners.push(() => node.removeEventListener(type, callback)); }
   error(error) {
@@ -56,7 +75,7 @@ export class ConsoleApp {
       this.catalog = new Map(catalog.map(p => [p.id, p])); this.library.render(catalog);
       this.library.setMatches([...this.snapshots.values()]); this.stats.setCatalog(catalog);
       this.stats.renderDashboard(this.dashboard.state);
-      this.notice.textContent = catalog.length ? 'Plugins confiables disponibles. Las reglas se ejecutan en el servidor.' : 'El catálogo autorizado no contiene plugins.';
+      this.notice.textContent = catalog.length ? 'Tu biblioteca está lista. Elige tu próximo juego.' : 'No hay juegos disponibles. Vuelve a actualizar la biblioteca.';
     } catch (error) { this.error(error); }
     finally { this.catalogBusy = false; }
   }
@@ -67,20 +86,26 @@ export class ConsoleApp {
     if (previous && (snapshot.gameId !== previous.gameId || snapshot.version < previous.version
       || (snapshot.version === previous.version && rank[snapshot.state] < rank[previous.state]))) return;
     this.snapshots.set(snapshot.matchId, structuredClone(snapshot));
-    const d = this.document, name = this.catalog.get(snapshot.gameId)?.name || snapshot.gameId;
+    const d = this.document, name = this.name(snapshot);
     let row = this.rows.get(snapshot.matchId);
     if (!row) {
       const node = element(d, 'li'), select = element(d, 'button'), detail = element(d, 'p', 'metadata');
       select.type = 'button'; select.addEventListener('click', () => void this.select(snapshot.matchId));
       const link = element(d, 'a', '', 'Nueva pestaña'); link.href = '/?match=' + encodeURIComponent(snapshot.matchId); link.target = '_blank'; link.rel = 'noopener';
+      link.title = 'Abre la misma partida; no crea otra instancia';
       node.append(select, detail, link); this.list.append(node); row = { node, select, detail }; this.rows.set(snapshot.matchId, row);
     }
     row.select.textContent = name; row.select.setAttribute('aria-pressed', String(snapshot.matchId === this.selectedId));
-    row.detail.textContent = snapshot.gameId + ' · ' + snapshot.matchId + ' · ' + snapshot.state + ' · v' + snapshot.version
-      + (snapshot.delivery ? ' · Outbox: ' + snapshot.delivery.pending + ' pendientes / ' + snapshot.delivery.delivered + ' entregados' : '');
+    row.select.setAttribute('aria-label', name + ' · ' + snapshot.matchId);
+    row.detail.textContent = shortId(snapshot.matchId) + ' · ' + ({ running: 'En juego', closing: 'Cerrando', finished: 'Finalizada' }[snapshot.state]);
+    const destination = snapshot.state === 'finished' ? this.historyList : this.list;
+    if (row.node.parentNode !== destination) destination.append(row.node);
     this.workspace.upsert(snapshot, name);
     this.library.setMatches([...this.snapshots.values()]);
-    if (previous?.state !== 'finished' && snapshot.state === 'finished' && this.selectedId === snapshot.matchId) void this.results.setKey(snapshot.matchId);
+    if (previous?.state !== 'finished' && snapshot.state === 'finished') {
+      this.notice.textContent = name + ' finalizó. Puedes consultar sus resultados en el historial.';
+      if (this.selectedId === snapshot.matchId) void this.results.setKey(snapshot.matchId);
+    }
   }
   reconcile(snapshots) {
     if (this.disposed) return;
@@ -95,14 +120,17 @@ export class ConsoleApp {
     }
     for (const snapshot of snapshots) this.accept(snapshot);
     this.library.setMatches([...this.snapshots.values()]);
-    if (!this.selectedId && snapshots.length) void this.select(snapshots[0].matchId);
+    const active = snapshots.find(s => s.state !== 'finished');
+    if (!this.selectedId && active) void this.select(active.matchId);
   }
   async create(gameId, options) {
     if (this.disposed || this.creating.has(gameId)) return;
     this.creating.add(gameId); this.library.setBusy(gameId, true);
     try {
       const snapshot = await this.api.create(gameId, options); if (this.disposed) return;
-      this.accept(snapshot); await this.select(snapshot.matchId); void this.sessions.refresh();
+      // A list requested before this confirmed creation must not remove the new match.
+      void this.sessions.setKey('matches');
+      this.accept(snapshot); await this.select(snapshot.matchId);
       this.workspace.records.get(snapshot.matchId)?.card.scrollIntoView?.({ block: 'start', behavior: 'smooth' });
     } catch (error) {
       this.error(error);
@@ -122,10 +150,12 @@ export class ConsoleApp {
       const snapshot = await this.api.snapshot(id);
       if (this.disposed || generation !== this.selection) return;
       if (!this.catalog.has(snapshot.gameId)) throw new ConsoleError(404, 'UNKNOWN_MATCH');
-      this.accept(snapshot); this.workspace.open(this.snapshots.get(id), this.catalog.get(snapshot.gameId).name);
+      this.accept(snapshot); const current = this.snapshots.get(id);
+      this.workspace.open(current, this.name(current)); this.setSection('play');
+      if (current.state === 'finished') this.document.getElementById('history').open = true;
       for (const [key, row] of this.rows) row.select.setAttribute('aria-pressed', String(key === id));
       this.window.history?.replaceState(null, '', this.window.location.pathname + '?match=' + encodeURIComponent(id));
-      this.document.getElementById('selected-title').textContent = this.catalog.get(snapshot.gameId).name + ' · ' + id;
+      this.document.getElementById('selected-title').textContent = this.name(current) + ' · ' + shortId(id);
     } catch (error) { if (generation === this.selection) this.error(error); }
   }
   async finish(id) {
@@ -157,6 +187,6 @@ export class ConsoleApp {
     if (this.disposed) return; this.disposed = true; this.selection++;
     for (const resource of [this.results, this.dashboard, this.sessions]) resource.dispose();
     for (const unsubscribe of this.unsubscribers) unsubscribe(); for (const remove of this.listeners) remove();
-    this.workspace.dispose(); this.bridge.dispose(); this.library.dispose(); this.list.replaceChildren(); this.rows.clear();
+    this.workspace.dispose(); this.bridge.dispose(); this.library.dispose(); this.list.replaceChildren(); this.historyList.replaceChildren(); this.rows.clear();
   }
 }

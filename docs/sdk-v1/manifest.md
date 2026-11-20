@@ -36,11 +36,13 @@ controles U+0000–U+001F y U+007F, texto vacío y espacios exteriores. Los camp
 son texto plano, no HTML, funciones, comandos ni expresiones ejecutables.
 
 `pause` y `resume` deben coincidir; no se acepta una pausa sin reanudación.
-`multipleInstances: true` es una promesa futura de sesiones independientes, sin
-estado mutable compartido de partida en el módulo. `false` permitirá como máximo
-una sesión activa de ese juego en el host futuro. `ai` solo describe una capacidad;
+`multipleInstances: true` declara sesiones independientes, sin
+estado mutable compartido de partida en el módulo. `false` permite como máximo
+una sesión sin finalizar de ese juego; GameInstanceManager conserva esa validación
+genérica. Desde [3G](phase-3g-multiinstance-experience.md), los tres paquetes
+productivos declaran true después de revisar su aislamiento. `ai` solo describe una capacidad;
 no concede acceso al intérprete ni ejecuta Prolog. El registro no comprueba que
-esas promesas coincidan con el código: esa verificación pertenece al runtime futuro.
+esas promesas coincidan con el código: se requiere revisar el paquete y probar su aislamiento.
 
 ## Opciones declarativas
 

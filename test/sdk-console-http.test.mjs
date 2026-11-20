@@ -56,4 +56,8 @@ test('console facade + authentic SDK handles pending results, real identities, p
   assert.equal(consoleApp.results.state.data.state,'closed');assert.equal(consoleApp.results.state.data.metrics[0].status,'final');assert.equal(consoleApp.workspace.records.get(snakeId).frame,frame);assert.ok(bridge.refreshes.includes(frame));assert.equal((await h.api.snapshot(racingId)).state,'running');
   await consoleApp.dashboard.inFlight;await consoleApp.dashboard.refresh();assert.equal(consoleApp.dashboard.state.data.totals.started,77,'official count is not recomputed from two SDK sessions');
   assert.equal(h.events.filter(e=>e.type==='MATCH_FINISHED').length,1);assert.equal(new Set(h.events.map(e=>e.eventId)).size,h.events.length);
+  await clock.runDelay(1800);assert.equal(consoleApp.workspace.records.get(snakeId).frame,null);
+  await consoleApp.select(snakeId);await consoleApp.results.inFlight;
+  assert.equal(consoleApp.workspace.records.get(snakeId).frame,null);assert.equal(h.app.sdk.manager.size,2);
+  assert.equal(h.events.filter(e=>e.type==='MATCH_FINISHED').length,1,'visual retirement/history never sends another finish');
 });

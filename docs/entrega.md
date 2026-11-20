@@ -8,8 +8,9 @@ Separar preparación de código de evidencia real del commit entregado.
 | Exactamente tres juegos | Paquetes Gato, Snake y Circuito; catálogo confiable | Catálogo desplegado y partidas completas manuales |
 | POO y SDK genérico | Rules/Session, Registry, Factory/Manager, Facade y Adapter | Explicación en video sobre la versión entregada |
 | IA auténtica | Adaptador SWI y programa privado del paquete | Una decisión real dentro del contenedor 3F |
-| Concurrencia | Tres tipos simultáneos; UUID y cola por partida | Tres paneles y acciones en el despliegue |
-| Instancias | Una sin finalizar por tipo, según manifiesto | Nueva pestaña comparte UUID; no contarla como otra instancia |
+| Concurrencia | Cuatro Circuitos independientes y dos Gato/Snake con transporte simulado; UUID y cola por partida | Modo enfocado/cuadrícula y acciones en el despliegue |
+| Instancias | Los tres manifiestos permiten varias; false sigue validándose para otros plugins | Crear desde varias pestañas; abrir ?match comparte UUID, no crea otra instancia |
+| Historial | Finished libera su iframe tras 1,8 s y conserva snapshot/resultados | Revisar resultado terminal y consulta posterior sin segundo cierre |
 | Eventos v1 y transporte | Confirmaciones, EventSink/Outbox, replay y entrega ordenada | Nuevo sdk-integration.json contra Go real |
 | Analítica Scala | Contratos/perfiles fijados; consola sin calculadoras | Métricas provisionales/finales, basis y source reales |
 | Estadísticas generales | Dashboard cada 5 s; conteos oficiales y avisos | Correspondencia con eventos recibidos por Go |
@@ -27,8 +28,10 @@ Separar preparación de código de evidencia real del commit entregado.
    eventos: leer la etapa y cerrar solo las partidas de prueba que corresponda.
 5. Guardar evidence/sdk-integration.json, sin modificarlo para aparentar aprobación.
    Debe indicar passed y configured-http-services; ningún doble sirve de evidencia.
-6. Revisar manualmente Gato/Prolog, Snake y Circuito, controles de foco, tres
-   paneles, estadísticas en vivo, cierre y recuperación mediante ?match.
+6. Revisar manualmente Gato/Prolog, Snake y Circuito, controles de foco y cuadrícula.
+   Crear cuatro Circuitos, incluso desde pestañas diferentes, y distinguir sus UUID.
+   Ver estadísticas en vivo, finalizar uno y comprobar que los demás siguen activos.
+   Consultar su historial y abrir ?match sin crear una sesión nueva.
 7. Tras revisión/commit por el equipo, disparar Actions manualmente sobre esa rama
    con integration=true. Conservar URL/run/artefacto del SHA correcto; no reutilizar
    un pipeline anterior como prueba del nuevo cambio.
