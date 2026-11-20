@@ -1,5 +1,9 @@
 # Fase 3C — bootstrap optativo y API HTTP genérica
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Implementado para uso local/de desarrollo. No hay migración de Gato, Snake ni
 Circuito, UI SDK, iframe, bridge, autenticación ni autorización de usuarios.
 El resultado PASSED de 3B contra Go/Scala es el comunicado por el equipo;
@@ -286,8 +290,8 @@ Solo `PASSED` y salida 0 acredita el recorrido HTTP real. Un 202 después de flu
 timeout, métrica/identidad/estado/conteo incorrecto o fallo remoto hace fallar el
 script. Cada ejecución crea un UUID nuevo y datos de prueba en Go. Una ejecución
 fallida puede dejar una partida remota abierta: se informa su UUID, sin afirmar
-rollback. Este script se prepara y revisa sintácticamente; **no se ejecuta de
-forma automática ni se declara verificada aquí la integración HTTP real**.
+rollback. La revisión de esta etapa cubrió la sintaxis del script; la ejecución
+HTTP real se registra por separado en el estado de entrega.
 
 Pendiente: autorización/titularidad, migración incremental de juegos, web/iframe,
 gestión durable, políticas de limpieza de historial e instancias y adaptación

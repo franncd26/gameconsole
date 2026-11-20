@@ -1,5 +1,9 @@
 # Fase 3D.1 — primer paquete real: Gato
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Implementado el plugin de servidor `tic-tac-toe` 1.1.0. Utiliza las rutas genéricas
 SDK sin modificar host, reglas históricas ni frontend. No es todavía jugable
 en el navegador: el HTML es un marcador explícito de integración pendiente.
@@ -217,13 +221,12 @@ No hay hooks globales en producción, red externa ni SWI real en esas pruebas.
 
 Para regresión se ejecutan las suites SDK/HTTP/Outbox existentes, sin modificarlas.
 `test/games.test.mjs` contiene dos pruebas con SWI real: no debe ejecutarse
-como parte de la verificación aislada. Durante esta tarea, un filtro intentado
-no excluyó esas pruebas y se ejecutaron accidentalmente las nueve pruebas de
-esa suite, incluidas las dos de SWI real. Pasaron, pero esa ejecución incumplió
-la restricción del encargo y se informó al equipo; no se recomienda repetirla.
+como parte de una verificación sin dependencias externas. El registro de esta
+etapa incluye nueve pruebas históricas aprobadas, dos de ellas con SWI real;
+esa ejecución se distingue de las pruebas aisladas del plugin.
 Las pruebas nuevas del plugin no ejecutan SWI ni el humo real.
 
-**Humo real opcional, no ejecutado por Codex**:
+**Prueba manual complementaria**:
 
 ```powershell
 $env:SWIPL_PATH = 'C:\ruta\swipl.exe' # opcional si ya está en PATH

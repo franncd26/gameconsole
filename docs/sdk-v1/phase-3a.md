@@ -1,5 +1,9 @@
 # Fase 3A — EventSink y EventOutbox
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Se conecta el administrador SDK con el EventOutbox existente mediante
 OutboxEventSink. La composición se verifica con **EventOutbox real y fetcher
 simulado**, sin sockets ni servicios. Se prepara un script manual para Go/Scala;
@@ -149,9 +153,9 @@ de 409, partidas independientes y avance de snapshot/versión antes de entregar.
 Las dos pruebas originales de test/outbox.test.mjs permanecen sin modificaciones.
 No se ejecuta el script manual como parte de node --test.
 
-## Prueba manual opcional Go/Scala — preparada, no ejecutada aquí
+## Prueba manual Go/Scala preparada en esta etapa
 
-El equipo debe tener Go/Scala ya iniciados por su cuenta y el perfil racing 1.0.0
+La prueba requiere Go/Scala ya iniciados y el perfil racing 1.0.0
 cargado. El script no levanta servicios, descarga, construye ni ejecuta Go/Scala.
 Solo necesita la URL del Go accesible desde Node; Scala puede permanecer en la
 red interna porque las comprobaciones pasan por el puente Go.

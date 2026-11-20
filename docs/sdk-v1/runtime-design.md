@@ -1,4 +1,10 @@
-# Runtime SDK 1.0 — estado implementado y contrato objetivo
+# Diseño y evolución del runtime SDK 1.0
+
+> **Referencia histórica de diseño.** Este documento conserva el contrato objetivo
+> y el estado de las primeras fases hasta 3C. Sus bocetos y funciones pendientes
+> no describen por sí solos la implementación final. Las interfaces concretas se
+> detallan en los informes posteriores; la arquitectura vigente está en
+> [arquitectura](../arquitectura.md) y el estado comprobado en [entrega](../entrega.md).
 
 Este documento describe el runtime objetivo. La [Fase 2A](phase-2a.md) concreta e
 implementa carga confiable, opciones, preparación y administración local de

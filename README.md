@@ -1,223 +1,137 @@
-# GameConsole SDK v1
+# GameConsole
 
-Experimento optativo: [importador .game.zip](docs/sdk-v1/phase-3i2-plugin-importer.md).
-`node scripts/deploy-importer.mjs` prepara un entorno local separado (:3001) con
-perfiles persistentes y recarga del proceso Scala. No cambia el despliegue académico
-ni su catálogo de tres juegos. La construcción y la recarga real requieren validación manual.
+Proyecto 2 de Lenguajes de Programación, TEC · Francisco Castillo y Justin.
 
-Proyecto 2 · Lenguajes de Programación, TEC · Francisco Castillo y Justin.
-Tres paquetes autónomos: Gato (SWI-Prolog), Snake y Circuito. La consola descubre
-plugins confiables, administra partidas e incrusta sus interfaces mediante Bridge v1.
-Go recibe eventos; Scala calcula estadísticas. El navegador no calcula métricas.
+GameConsole ejecuta videojuegos web como plugins independientes. La consola permite
+crear partidas concurrentes, jugar en una vista enfocada o en cuadrícula y consultar
+estadísticas calculadas por GameStats mientras las partidas continúan.
 
-**3F está preparada para validación real.** Se han realizado inspección y pruebas
-ligeras; no se certifican todavía las nuevas imágenes, Compose o GitHub Actions.
-Consultar [estado y detalles de 3F](docs/sdk-v1/phase-3f-deployment.md).
+La configuración académica incorpora exactamente tres videojuegos:
 
-La [Fase 3G](docs/sdk-v1/phase-3g-multiinstance-experience.md) habilita varias
-partidas independientes de cada juego y reorganiza la consola en biblioteca,
-área de juego enfocada/cuadrícula e historial. Verificada con pruebas ligeras;
-su revisión visual y las estadísticas contra servicios reales quedan a cargo del equipo.
+| Juego | Funcionamiento | Controles |
+| --- | --- | --- |
+| Gato | Tres dificultades; oponente con inteligencia artificial en SWI-Prolog | Clic o Tab/Enter; Reintentar IA si falla una decisión |
+| Snake | Cuadrículas de 12, 20 o 28; crecimiento, puntuación y colisiones oficiales en el servidor | Jugar, flechas/WASD o botones táctiles |
+| Circuito | Tres carriles, obstáculos y carrera de tres vueltas | Jugar, izquierda/derecha o A/D; arriba/W acelera y abajo/S frena |
 
-## Requisitos y arranque reproducible
+## Requisitos y despliegue
 
 Git, Node.js 22 y Docker Engine/Desktop con contenedores Linux y Compose v2
-compatible con `up --wait`. Se requiere acceso a Internet para obtener fuentes,
-imágenes y dependencias de compilación. No es necesario instalar Go, Scala o
-SWI-Prolog en el anfitrión al utilizar Docker.
+compatible con `up --wait`. La construcción necesita acceso a las fuentes e imágenes
+de sus dependencias. Go, Scala y SWI-Prolog se incluyen en los contenedores.
+No se requieren frameworks ni dependencias npm para la aplicación.
+
+Mientras la [PR #1](https://github.com/JusMH/gameconsole/pull/1) siga abierta,
+la versión SDK se encuentra en la rama `experiment/live-plugin-import`:
 
 ```powershell
-git clone https://github.com/JusMH/gameconsole.git
+git clone --branch experiment/live-plugin-import https://github.com/JusMH/gameconsole.git
 cd gameconsole
 node scripts/deploy.mjs
 ```
 
-Abrir **http://127.0.0.1:3000/**. El SDK es la experiencia principal de Compose;
-también está en `/sdk/console.html`. El catálogo debe mostrar exactamente Gato,
-Snake y Circuito; un healthcheck 200 por sí solo no demuestra esa configuración.
+Abrir **http://127.0.0.1:3000/**. El despliegue prepara GameStats en el commit
+`4adee854ea3b35148b1eadd0549d4d8e647b345c`, construye tres servicios y espera su salud:
 
-El preparador obtiene GameStats de `gamestats.lock.json`, fijado en
-`4adee854ea3b35148b1eadd0549d4d8e647b345c`. Si hay modificaciones en `.deps`
-se detiene sin sobrescribirlas. No se sustituye una dependencia inaccesible por
-datos simulados. En rutas Windows con caracteres no ASCII, deploy usa una copia
-de construcción bajo el directorio temporal. No modificar GameStats allí.
+| Servicio | Responsabilidad | Acceso predeterminado |
+| --- | --- | --- |
+| gameconsole | Node.js 22, plugins y SWI-Prolog | 127.0.0.1:3000 |
+| go-ingestion | Recepción y consulta de eventos GameStats | 127.0.0.1:8080 |
+| scala-analysis | Cálculo de métricas y patrones | DNS interno, puerto 9000 |
+
+El preparador conserva cambios locales en `.deps` y resuelve las rutas Windows con
+caracteres no ASCII mediante una copia de construcción. No modificar la dependencia
+preparada. `PORT` y `GAMESTATS_PORT` permiten cambiar los puertos publicados.
 
 ```powershell
 node scripts/deploy.mjs --stop
 ```
 
-Este apagado actúa sobre el proyecto Compose `gameconsole`. No ejecuta prune ni
-borra volúmenes de otros proyectos. Reiniciar los procesos pierde sus datos en memoria.
+El apagado afecta al proyecto Compose `gameconsole`, sin borrar volúmenes ajenos.
 
-## Servicios y configuración
+## Cómo jugar
 
-| Servicio | Contenido | Acceso predeterminado |
-| --- | --- | --- |
-| gameconsole | Node.js 22, SDK, tres paquetes completos y SWI-Prolog | 127.0.0.1:3000 |
-| go-ingestion | GameStats Go, construido desde el SHA fijado | 127.0.0.1:8080 |
-| scala-analysis | GameStats Scala/Java 21 con perfiles del mismo SHA | DNS interno, puerto 9000 |
+1. Elegir un juego en Biblioteca, configurar sus opciones y crear la partida.
+2. Jugar en su panel; crear otras partidas, incluso del mismo videojuego, para
+   ejecutarlas de forma independiente. Cuadrícula permite ver varias a la vez.
+3. En cuadrícula, Ctrl + Alt + J/K enfoca el juego anterior/siguiente. También
+   funciona desde los iframe; no intercepta campos editables ni teclas de movimiento.
+   El navegador o sistema operativo puede reservar esas combinaciones.
+4. Consultar estadísticas en la tarjeta y en el panel seleccionado. Las consultas
+   son periódicas y acotadas; `null` o no disponible no se muestran como cero.
+5. Finalizar administrativamente una partida o completar su objetivo. El historial
+   conserva resultados y libera el iframe finalizado sin duplicar el cierre.
 
-Prolog es un proceso dentro de gameconsole, no un cuarto servicio. Compose conserva
-healthchecks, dependencias saludables, usuarios sin privilegios, filesystem de
-solo lectura, tmpfs y capacidades restringidas.
+Jugar inicia Snake y Circuito; Pausa/Continuar controla la actividad local. Perder
+foco libera teclas sin exigir otra activación. Ajustes permite suspender al ocultar
+y reanudar al regresar; ambas preferencias están activadas por defecto. La reanudación
+consulta el estado confirmado y una pausa manual se conserva. No es una pausa del
+servidor ni modifica las duraciones calculadas por GameStats.
 
-Variables del servicio gameconsole:
+Nueva pestaña abre `/?match=<id>` y comparte la misma partida; no crea otro UUID.
+Con Web Locks, una pestaña controla y las demás observan. Tomar control coordina
+la transferencia; sin soporte se advierte que no se garantiza exclusividad.
 
-```yaml
-GAMECONSOLE_SDK_ENABLED: "1"
-GAMECONSOLE_PLUGINS_DIR: /app/plugins
-GAMECONSOLE_TRUSTED_IDS: tic-tac-toe,snake,racing
-GAMESTATS_URL: http://go-ingestion:8080
-```
+## Integración con GameStats
 
-`PORT` y `GAMESTATS_PORT` cambian los puertos loopback publicados:
-en PowerShell, por ejemplo, `$env:PORT='3001'` antes de deploy. Las URLs de las
-pruebas deben ser accesibles desde el anfitrión; CONSOLE_URL y GAMESTATS_URL
-permiten indicarlas explícitamente. El valor Go interno de Compose no se cambia
-por una dirección localhost del anfitrión.
+El SDK confirma estado y eventos localmente; EventOutbox entrega los eventos a Go
+en orden por partida. Scala calcula los resultados bajo demanda. **Confirmado,
+entregado y analizado son estados distintos.** El navegador presenta métricas,
+patrones y conteos oficiales sin recalcularlos.
 
-Para HTTP local no se fija GAMECONSOLE_PUBLIC_ORIGIN: el host validado conserva
-el puerto real. Solo ante un reverse proxy HTTPS, configurar esa variable en el
-entorno del servicio (por ejemplo, mediante un override local) con el origen
-HTTPS canónico, sin ruta, query ni credenciales. No se confía en Forwarded del cliente.
+Si Prolog falla después de confirmar una X, la jugada permanece y Reintentar IA
+permite continuar. Si GameStats falla, las partidas pueden seguir confirmando
+localmente mientras se informa la entrega o consulta pendiente. No se asegura
+rollback de una operación cuyo resultado de transporte es desconocido.
 
-## Jugar, abrir partidas y consultar estadísticas
+## Pruebas y CI/CD
 
-1. Elegir un juego en la biblioteca dinámica y configurar sus opciones.
-   Gato: easy/medium/hard (hard predeterminado); Snake: 12/20/28; Circuito: tres
-   vueltas fijas. La validación definitiva es del SDK.
-2. Crear la partida. Gato utiliza clic o Tab/Enter para colocar X; Prolog decide O.
-   Snake usa Jugar y flechas/WASD o botones. Circuito usa Jugar,
-   mantiene acelerar/frenar y cambia de carril con flechas/A-D o botones.
-3. Crear más partidas, incluso del mismo juego: los tres manifiestos permiten
-   **múltiples instancias independientes**. Cuatro Circuitos tienen cuatro UUID,
-   tableros/estados y versiones propios; crear otra partida no sustituye la anterior.
-4. En Partidas, elegir una en la lista compacta o activar Cuadrícula para ver varias.
-   Seleccionar o cambiar de sección conserva los iframe. Diagnóstico permite ocultar
-   o restablecer una vista; restablecer crea un iframe nuevo para la misma partida.
-   Cada tarjeta de cuadrícula muestra sus propias estadísticas de GameStats. Ctrl +
-   Alt + J / K recorre y enfoca juegos activos, también desde dentro de un iframe.
-   Los atajos no transfieren el control entre pestañas. Más métricas y patrones
-   conserva el acceso al resultado analítico completo.
-5. Nueva pestaña abre `/?match=<id>`: comparte la misma partida y UUID;
-   **no crea una instancia adicional**. Puede haber conflictos de versión entre
-   clientes. Recargar recupera las partidas del proceso, sin persistencia durable.
-6. Resultados en vivo consulta la partida seleccionada aproximadamente cada 3 s.
-   Estadísticas generales consulta el dashboard de GameStats cada 5 s, incluidos
-   conteos por juego y muestras inválidas. Null/no disponible no equivale a cero.
-
-Snake/Circuito se inician una vez con Jugar; el botón permite Pausa/Continuar.
-Cambiar el foco libera teclas, sin exigir otra activación. En Ajustes, Pausar al
-ocultar y Reanudar al regresar están habilitados por defecto: volver resincroniza
-antes de avanzar. La pausa manual se conserva. Son preferencias de actividad local,
-no pause/resume oficial del SDK ni un cambio de las duraciones de GameStats.
-Con Web Locks, otra pestaña de la misma partida entra como observadora y puede
-Tomar control de manera ordenada. Sin soporte se advierte que no hay exclusividad
-garantizada. No coordina navegadores o equipos diferentes.
-Consultar [comportamiento y límites de 3H](docs/sdk-v1/phase-3h-game-experience.md).
-La [Fase 3I.1](docs/sdk-v1/phase-3i1-multigame-ux.md) mantiene Pausa estable durante
-ticks normales, permite pausar una acción pendiente y añade estadísticas por tarjeta
-con consultas compartidas y acotadas. La primera sincronización y los errores se
-siguen mostrando; no se ocultan operaciones inciertas ni se alteran reglas.
-Finalizar es administrativo; no fabrica victoria ni carrera completada.
-Al confirmarse finished, la vista muestra brevemente el final y libera su canal
-tras 1,8 s. La partida queda en el historial plegable con sus resultados; consultarla
-no monta otro iframe ni emite otro cierre. Al recargar se prefieren partidas activas.
-Los nombres numerados y UUID abreviados son presentación; el identificador completo
-y la información de entrega están en Diagnóstico. Una partida finalizada sigue
-ocupando memoria del SDK hasta reiniciar el proceso.
-
-## Confirmado, entregado y analizado
-
-- **Confirmado localmente:** SDK aceptó estado/eventos en memoria y avanzó versión.
-- **Entregado:** Outbox confirmó el prefijo en Go; no significa que Scala lo analizó.
-- **Analizado:** una consulta de resultados/dashboard devolvió datos de Scala,
-  con status y basis correspondientes. El cierre puede dejar métricas unavailable
-  legítimas: abandonar Gato no inventa ganador; un promedio sin vueltas no es cero.
-
-Si Prolog falla después de confirmar X, la X permanece y awaitingAI permite
-Reintentar IA. Un resultado desconocido del Bridge no se reintenta automáticamente
-con otra identidad. Si GameStats falla, los juegos pueden seguir confirmando
-localmente y mostrar entregas pendientes; no se sustituyen estadísticas por
-cálculos JavaScript. Consultar logs y recuperar el servicio, no reiniciar Go
-durante partidas esperando conservar sus inicios.
-
-## Verificación y evidencia
+Para las pruebas locales se necesitan Node.js 22, SWI-Prolog en PATH
+(o `SWIPL_PATH`) y Python 3 para los ZIP del importador (`py -3` en Windows).
 
 ```powershell
 npm run check
-node --test test/sdk-deployment.test.mjs test/sdk-compose-integration.test.mjs
-# Solo con los tres servicios reales desplegados y sin jugadores simultáneos:
+node --test test/sdk-compose-integration.test.mjs
+npm test
+# Solo con el despliegue real listo y sin partidas abiertas/productores concurrentes:
 npm run test:integration:sdk
 ```
 
-La prueba SDK tiene límite global predeterminado de 120 s (máximo 180 s mediante
-SDK_INTEGRATION_TIMEOUT_MS), polling moderado y una sola acción por juego. Comprueba
-catálogo/root, tres UUID concurrentes, Prolog real, aislamiento, replay, entrega a
-Go, métricas provisionales/finales de perfiles reales y dashboard +3. Finaliza sus
-propias partidas conocidas; no completa carreras ni toca sesiones ajenas.
-Exige un entorno sin partidas SDK abiertas y sin productores concurrentes.
+`npm test` incluye pruebas históricas con Prolog y pruebas HTTP locales con dobles;
+no levanta Docker ni Go/Scala. La integración SDK usa servicios ya desplegados y
+genera `evidence/sdk-integration.json`. Las comprobaciones históricas
+`npm run test:integration` y `node scripts/recovery.mjs` se conservan por separado.
 
-Evidencia: `evidence/sdk-integration.json`, incluso ante fallo. Incluye etapas,
-IDs, recibos locales, estados Go, basis/procedencia Scala y resultados. Un POST de
-resultado desconocido puede dejar una partida cuyo ID no se obtuvo: inspeccionar
-el listado y cerrar manualmente; no se afirma rollback. Los dobles de pruebas
-llevan transport=injected-test-transport y **no son evidencia real**.
+GitHub Actions verifica Node 22, sintaxis, suite Node y Prolog en PR/main/manual.
+El trabajo integrado construye Compose y ejecuta una integración SDK real en push
+a main o mediante `workflow_dispatch` con `integration=true`; conserva evidencia
+y apaga los servicios. El deployment del proyecto es local, no alojamiento remoto.
+El estado verificable de CI y de la entrega se mantiene en [docs/entrega.md](docs/entrega.md).
 
-`npm test` incluye las pruebas históricas que requieren SWI-Prolog. La integración
-histórica `npm run test:integration` y recuperación `node scripts/recovery.mjs`
-se conservan como comprobaciones manuales separadas; no ejecutarlas indiscriminadamente
-ni duplicarlas con la integración SDK en la CI.
+## Importador experimental
 
-Para inspección, desde la raíz:
+El importador es adicional y está deshabilitado en el despliegue académico.
+Su entorno independiente se inicia con `node scripts/deploy-importer.mjs` en
+`http://127.0.0.1:3001/` y se apaga con el mismo comando más `--stop`.
+Admite paquetes confiables `.game.zip` compatibles con el SDK y perfiles Scala,
+no archivos JAR/Swing directamente. El equipo verificó la importación real de
+Wall Defender con dos partidas y métricas Go/Scala. El rollback ante perfil inválido
+y la victoria tras nueve oleadas siguen pendientes de comprobación manual.
 
-```powershell
-docker compose -p gameconsole ps
-docker compose -p gameconsole logs --no-color --tail=100 gameconsole go-ingestion scala-analysis
-```
+Formato, permisos y uso: [importador experimental](docs/sdk-v1/phase-3i2-plugin-importer.md).
 
-## CI/CD y entrega
+## Limitaciones y documentación
 
-GitHub Actions ejecuta Node 22, sintaxis, pruebas Node y Prolog en PR/main/manual.
-Las imágenes y **una** integración SDK real se ejecutan solo en push a main o
-workflow_dispatch con integration habilitado. En Actions → GameConsole CI →
-Run workflow, elegir la rama revisada y habilitar integration. No necesita
-secretos de despliegue ni publica una web remota. La preparación descarga la
-dependencia fijada; Compose valida, construye, espera salud, ejecuta y guarda el
-artefacto sdk-integration. Siempre intenta detener su proyecto aislado.
+Las partidas, eventos pendientes y la idempotencia residen en memoria; reiniciar
+Node/Go pierde sus datos respectivos. El límite es de 500 partidas por proceso
+y 32 canales por HostBridge. No hay cuentas ni autorización global de jugadores;
+Web Locks coordina solo el mismo navegador/origen. Los plugins Node son código
+confiable: el sandbox del iframe no los aísla. Los temporizadores ocultos pueden
+ser limitados por el navegador.
 
-No afirmar CI en verde hasta tener una ejecución del commit entregado. Guardar
-esa URL, artefacto, SHA, captura de servicios saludables y evidencia real.
-Deployment significa **Docker Compose local**, no alojamiento en Internet.
-
-## Arquitectura, límites y documentación
-
-```text
-Consola SDK → iframe sandbox + Bridge → API genérica → Manager
-                                                    ↓
-Plugin (Rules/Session; Gato → Prolog privado) → EventSink/Outbox → Go → Scala
-```
-
-Registro/fábrica, Facade/Adapter, Observer y colas por instancia separan dominio,
-presentación, lifecycle y analítica. Los paquetes residen en plugins/, el runtime
-en server/sdk/ y la consola en public/sdk/. El frontend/rutas históricos siguen
-disponibles: fuera de Compose, SDK deshabilitado conserva el root anterior.
-Para ese modo dejar sin definir el directorio y trustedIds además de deshabilitar
-SDK; la configuración segura rechaza SDK=0 con una lista/directorio todavía activos.
-
-Memoria no durable; máximo actual de 500 partidas por proceso y 32 canales por
-HostBridge. No hay cuentas, autorización de titulares ni exclusividad entre pestañas.
-Origin y sandbox web no aíslan código Node no confiable: solo se cargan IDs
-instalados y autorizados. No se incorporan nuevos juegos, perfiles ni dependencias.
-
-- [Documentación SDK](docs/sdk-v1/README.md)
-- [3F: despliegue e integración](docs/sdk-v1/phase-3f-deployment.md)
-- [Matriz de entrega](docs/entrega.md)
-- [Guion de video, 12 minutos](docs/video.md)
-- GameConsole (origin verificado): https://github.com/JusMH/gameconsole
-- GameStats: https://github.com/JusMH/gamestats
-
-Pendientes humanos: validación real, accesibilidad/jugabilidad final, ejecución
-de Actions, video público y entrega en Tec Digital antes del **20/11/2026, 22:00
-de Costa Rica**. No se encontró el enunciado PDF/DOCX en los repositorios locales;
-confirmar requisitos adicionales con el docente, sin inventar modalidades de juego.
+- [Arquitectura y decisiones](docs/arquitectura.md)
+- [Contratos de integración](docs/integracion.md)
+- [Estado de verificación y entrega](docs/entrega.md)
+- [Referencia SDK e historial](docs/sdk-v1/README.md)
+- [Guion interno de video](docs/video.md)
+- [Repositorio GameStats](https://github.com/JusMH/gamestats)

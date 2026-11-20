@@ -1,5 +1,9 @@
 # Fase 2A — carga y preparación local, sin integración HTTP o GameStats
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Este documento conserva el alcance auditado de 2A. Las extensiones vigentes de
 activación/cierre, EventSink y contexto se describen en [Fase 2B.1](phase-2b1.md).
 Las interfaces de preparación se conservan; las diferencias están indicadas allí.

@@ -107,3 +107,16 @@ test('global deadline is enforced for an unresponsive HTTP transport; no service
   const r=await run({fetcher:(_url,init)=>new Promise((_,reject)=>{init.signal.addEventListener('abort',()=>reject(Error('private timeout')),{once:true});})},{timeoutMs:1000});
   assert.equal(r.status,'failed');assert.equal(r.failure.code,'GLOBAL_TIMEOUT');assert.equal(r.matches.length,0);
 });
+
+test('global deadline releases its referenced timer on success, failure and evidence write failure',async t=>{
+  const timers = () => process.getActiveResourcesInfo().filter(type => type === 'Timeout').length;
+  const before = timers();
+  assert.equal((await run(transport(), { timeoutMs: 180000 })).status, 'passed');
+  assert.equal(timers(), before);
+  assert.equal((await run(transport({simulated:true}), { timeoutMs: 180000 })).status, 'failed');
+  assert.equal(timers(), before);
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'sdk-evidence-write-failure-'));
+  t.after(()=>rm(directory,{recursive:true,force:true}));
+  await assert.rejects(run(transport(), { timeoutMs: 180000, evidenceFile: directory }));
+  assert.equal(timers(), before);
+});

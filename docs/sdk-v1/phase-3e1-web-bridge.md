@@ -1,5 +1,9 @@
 # Fase 3E.1 — recursos web y GameConsole Bridge v1
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Actualización posterior: [3H](phase-3h-game-experience.md) añade el mensaje
 host → juego PRESENTATION y observación defensiva de presentación, manteniendo
 la versión 1, validación de canal/origen/source, CSP y sandbox.
@@ -323,7 +327,7 @@ node --test test/sdk-web-assets.test.mjs test/sdk-bridge-protocol.test.mjs test/
 git diff --check
 ```
 
-Comprobación real realizada en el navegador integrado de Codex, usando una consola
+La revisión en navegador de esta etapa utilizó una consola
 temporal local con transporte Go simulado: los tres HTML cargaron ESM bajo la CSP
 y sandbox indicados, mostraron Conectado/identidad/running/version=0, y desmontar
 y volver a montar Snake mantuvo conectados Circuito y Gato. No se despacharon

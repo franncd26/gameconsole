@@ -1,9 +1,11 @@
 # Fase 3I.2 — Importador experimental de paquetes
 
 Rama experiment/live-plugin-import, base 482e278e8febdbf36fe22adcf51e69d6bd7ea784.
-Implementación preparada y comprobada mediante pruebas ligeras. **Docker, recarga
-real de Java/Scala, permisos de bind mounts y navegador requieren validación manual.**
-No se declara demostrado el recorrido real hasta ejecutar esa comprobación.
+Referencia técnica del entorno experimental. El equipo comprobó manualmente el
+despliegue y la importación real de Wall Defender: dos partidas independientes y
+métricas obtenidas de Go/Scala. Esta comprobación no certifica el pipeline académico
+del commit definitivo. El rollback ante un perfil inválido y la victoria después
+de nueve oleadas permanecen pendientes de validación manual.
 
 ## Paquete .game.zip
 
@@ -167,7 +169,7 @@ node scripts/package-import-demo.mjs
 node scripts/deploy-importer.mjs --stop
 ```
 
-Estos comandos **no fueron ejecutados por Codex**. Deploy usa prepare.mjs y el SHA
+Deploy usa prepare.mjs y el SHA
 fijado, construye las imágenes base y las dos capas experimentales, inicia solo el
 proyecto Compose gameconsole-importer y espera healthchecks. Stop no borra datos.
 Conserva el tratamiento de rutas Windows no ASCII mediante copia de construcción;
@@ -185,7 +187,8 @@ Node escribe paquetes/perfiles como UID 1000. Scala UID 10001 solo lee perfiles
 y escribe el acuse en control; Node monta control de solo lectura. El preparador
 crea los bind mounts Unix con directorios 0777 para este laboratorio local, archivos
 0644; Windows depende del mapeo de Docker Desktop. No es una política multiusuario
-de producción. Deben probarse permisos en el sistema de entrega. No hay socket Docker.
+de producción. El despliegue se comprobó en el entorno del equipo; un anfitrión
+distinto requiere validar sus permisos de volúmenes. No hay socket Docker.
 
 ## Fixture, pruebas y comprobación manual
 
@@ -206,13 +209,22 @@ node scripts/check.mjs
 git diff --check
 ```
 
-Resultado de esta revisión: 16 pruebas nuevas aprobadas y regresión ampliada de
+El registro automatizado de implementación consigna 16 pruebas nuevas y una regresión de
 332 pruebas aprobadas, cero fallos u omisiones. Sintaxis aprobada en 120 archivos;
 git diff --check sin errores. Node disponible v24.21.0; ZIP procesados realmente
-con Python local. No se ejecutaron Docker, Node 22 en contenedor, Java/Scala, Go,
-Prolog ni navegador. La revisión de Compose/supervisor es estática.
+con Python local. Esa revisión inicial no incluyó servicios reales. La comprobación
+manual posterior de despliegue/Wall Defender se distingue de esos resultados con dobles.
+La suite y CI actuales se registran en [entrega](../entrega.md).
 
-Prueba manual integrada pendiente:
+## Estado manual y comprobaciones complementarias
+
+El registro del equipo confirma importación real de Wall Defender, dos partidas
+y métricas Go/Scala. No consta en esta documentación un artefacto de CI que sustituya
+esa comprobación manual. No se ha confirmado rollback de un perfil inválido ni la
+victoria al completar nueve oleadas.
+
+El procedimiento siguiente permite repetir la validación con el fixture y ampliar
+los escenarios. No implica que todos sus pasos ya se hayan ejecutado:
 
 1. Arrancar el entorno experimental; comprobar tres servicios sanos y tres juegos.
 2. Iniciar un Snake/Circuito original y conservar sus UUID/versión.
@@ -226,8 +238,11 @@ Prueba manual integrada pendiente:
    del perfil, recuperación de resultados originales y ningún nuevo juego anunciado.
 7. Reiniciar el entorno: recuperar juegos autorizados y perfiles, no sesiones.
 8. Volver al despliegue académico: catálogo de exactamente tres e importación deshabilitada.
+9. En Wall Defender, comprobar por separado la victoria tras nueve oleadas y registrar
+   el resultado real. Este escenario permanece pendiente.
 
 Límites: una instancia Node instaladora por almacenamiento compartido; sin instalación
 distribuida, firmas ni sandbox Node. Código confiable que bloquee su import/fábrica puede
-bloquear el proceso. El supervisor y bind mounts están preparados pero pendientes de
-Docker real; tampoco se certificó el navegador. No se portó Wall Defender ni un JAR.
+bloquear el proceso. La comprobación manual de despliegue e importación no cubre
+automáticamente todos los fallos posibles ni certifica otro entorno. Wall Defender
+es un paquete adicional del experimento; no se admite ejecutar un JAR directamente.

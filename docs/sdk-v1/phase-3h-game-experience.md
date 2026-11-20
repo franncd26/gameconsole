@@ -1,5 +1,9 @@
 # Fase 3H — Actividad local, preferencias y control entre pestañas
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 [3I.1](phase-3i1-multigame-ux.md) distingue las actualizaciones normales del estado
 Sincronizando, añade resúmenes analíticos por tarjeta y NAVIGATION_REQUEST. Conserva
 las preferencias y el control entre pestañas descritos aquí.

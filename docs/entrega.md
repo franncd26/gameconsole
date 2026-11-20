@@ -1,44 +1,68 @@
-# Verificación de entrega SDK
+# Estado de verificación y entrega
 
-Entrega: **20 de noviembre de 2026, antes de las 22:00, Costa Rica**.
-Separar preparación de código de evidencia real del commit entregado.
+Proyecto 2 · Entrega prevista: **20 de noviembre de 2026, antes de las 22:00, Costa Rica**.
+Este registro distingue implementación, pruebas locales y certificación del commit entregado.
 
-| Requisito | IMPLEMENTADO / inspección y pruebas ligeras | PENDIENTE DE VALIDACIÓN REAL |
-| --- | --- | --- |
-| Exactamente tres juegos | Paquetes Gato, Snake y Circuito; catálogo confiable | Catálogo desplegado y partidas completas manuales |
-| POO y SDK genérico | Rules/Session, Registry, Factory/Manager, Facade y Adapter | Explicación en video sobre la versión entregada |
-| IA auténtica | Adaptador SWI y programa privado del paquete | Una decisión real dentro del contenedor 3F |
-| Concurrencia | Cuatro Circuitos independientes y dos Gato/Snake con transporte simulado; UUID y cola por partida | Modo enfocado/cuadrícula y acciones en el despliegue |
-| Instancias | Los tres manifiestos permiten varias; false sigue validándose para otros plugins | Crear desde varias pestañas; abrir ?match comparte UUID, no crea otra instancia |
-| Historial | Finished libera su iframe tras 1,8 s y conserva snapshot/resultados | Revisar resultado terminal y consulta posterior sin segundo cierre |
-| Eventos v1 y transporte | Confirmaciones, EventSink/Outbox, replay y entrega ordenada | Nuevo sdk-integration.json contra Go real |
-| Analítica Scala | Contratos/perfiles fijados; consola sin calculadoras | Métricas provisionales/finales, basis y source reales |
-| Estadísticas generales | Dashboard cada 5 s; conteos oficiales y avisos | Correspondencia con eventos recibidos por Go |
-| Docker reproducible | Imagen incluye paquetes; Compose activa SDK y tres servicios | Build, healthchecks y Prolog del contenedor |
-| CI/CD | Verificación ligera y job integrado main/manual, artefactos y limpieza | Run del commit entregado con enlace y estado aprobado |
-| Documentación y video | README de ejecución, detalles 3F y guion de 12 min | Grabar/publicar video, comprobar acceso y adjuntar enlace |
+## Funcionalidad y evidencia
 
-## Única validación controlada del equipo
+| Área | Estado y alcance de la comprobación |
+| --- | --- |
+| Juegos académicos | Gato, Snake y Circuito como paquetes independientes, interfaces web, múltiples instancias y Bridge implementados. |
+| Reglas e IA | Reglas oficiales en el servidor; Gato utiliza SWI-Prolog real. Las pruebas locales incluyen la suite histórica de Prolog. |
+| SDK/HTTP/Outbox | Contratos, aislamiento, idempotencia, fallos y entrega cubiertos por pruebas Node; los dobles analíticos no certifican Go/Scala. |
+| Integración real previa | El registro local `evidence/sdk-integration.json` contiene status=passed y transport=configured-http-services; incluye Prolog, entrega, resultados provisionales/finales y dashboard. |
+| Importador experimental | El equipo comprobó despliegue e importación real de Wall Defender, dos partidas y métricas Go/Scala. No equivale a un cuarto juego académico. |
+| Rollback experimental / victoria | Pendiente comprobación manual de perfil inválido y victoria de Wall Defender tras nueve oleadas. |
+| CI del PR | El run enlazado abajo falló en verify por una prueba cancelada; integrated quedó omitido. La corrección local requiere publicación y una nueva ejecución. |
+| Video | Guion interno disponible; grabación, publicación y enlace definitivo pendientes. |
 
-1. Revisar el diff y conservar el SHA aprobado. Confirmar acceso a ambos repositorios.
-2. Ejecutar `node scripts/deploy.mjs`. Esperar Scala → Go → consola saludables.
-3. Abrir / y comprobar consola SDK y catálogo de exactamente tres plugins.
-4. En entorno sin partidas abiertas/jugadores simultáneos, ejecutar
-   `npm run test:integration:sdk` **una vez**. Un fallo no certifica ausencia de
-   eventos: leer la etapa y cerrar solo las partidas de prueba que corresponda.
-5. Guardar evidence/sdk-integration.json, sin modificarlo para aparentar aprobación.
-   Debe indicar passed y configured-http-services; ningún doble sirve de evidencia.
-6. Revisar manualmente Gato/Prolog, Snake y Circuito, controles de foco y cuadrícula.
-   Crear cuatro Circuitos, incluso desde pestañas diferentes, y distinguir sus UUID.
-   Ver estadísticas en vivo, finalizar uno y comprobar que los demás siguen activos.
-   Consultar su historial y abrir ?match sin crear una sesión nueva.
-7. Tras revisión/commit por el equipo, disparar Actions manualmente sobre esa rama
-   con integration=true. Conservar URL/run/artefacto del SHA correcto; no reutilizar
-   un pipeline anterior como prueba del nuevo cambio.
-8. Grabar el video y verificar su enlace público, nombres de autores y privacidad.
-9. Apagar con `node scripts/deploy.mjs --stop` y entregar en Tec Digital.
+El informe local de integración SDK comenzó el 19/11/2026 a las 23:49 de Costa Rica
+(`2026-11-20T05:49:11.920Z`). Conserva IDs, eventos, source/basis y resultados de los
+tres juegos. Es evidencia de esa ejecución previa; no certifica por sí solo la
+revisión final del PR ni sustituye su pipeline integrado.
 
-No se han ejecutado builds, Docker, Go/Scala/Prolog reales ni Actions durante
-la preparación de 3F por Codex. La integración histórica y recuperación se
-conservan, pero no se duplican automáticamente con la nueva integración SDK.
-No hay alojamiento remoto ni persistencia de sesiones entre reinicios.
+La comprobación manual del importador se registra a partir del informe del equipo;
+no cuenta con un artefacto adjunto versionado.
+Los informes `evidence/` se conservan fuera de Git y deben archivarse para la entrega.
+
+## CI y corrección del plazo global
+
+- [PR #1](https://github.com/JusMH/gameconsole/pull/1): experiment/live-plugin-import → main.
+- [Run 44808432657](https://github.com/JusMH/gameconsole/actions/runs/44808432657):
+  verify con 341 pruebas, 340 aprobadas, 0 fallos de aserción y 1 cancelada.
+- La promesa sin transporte activo no mantenía vivo el event loop de Node.
+  El plazo global usa ahora AbortController y un setTimeout referenciado, limpiado
+  en finally; conserva GLOBAL_TIMEOUT, límites HTTP, cancelación y limpieza de partidas.
+- Validación local con Node 22.13.1: cinco repeticiones de la suite focalizada sin
+  cancelaciones; la suite ampliada pasa 342 pruebas. Sintaxis: 120 archivos.
+  También se verifica la liberación del temporizador en éxito, fallo y error de evidencia.
+
+La corrección no está certificada por GitHub Actions hasta publicarla y ejecutar
+el workflow del SHA definitivo. La integración académica definitiva sigue pendiente
+del job integrated; la ejecución manual previa no cambia ese estado.
+
+## Lista de cierre
+
+1. Revisar/publicar los cambios y conservar el SHA definitivo.
+2. Ejecutar Actions en esa revisión: verify y workflow_dispatch con integration=true.
+   Guardar URL, estado y artefacto sdk-integration; no reutilizar un run anterior.
+3. Confirmar catálogo de tres, Gato/Prolog, Snake, Circuito, concurrencia, controles
+   de teclado y estadísticas en el entorno que se mostrará en la entrega.
+4. Archivar evidencia real y diferenciar datos de dobles, analítica provisional/final
+   y confirmación local frente a entrega a Go.
+5. Completar el [guion de video](video.md) con una grabación de 10–13 minutos,
+   comprobar acceso al enlace y adjuntarlo a la entrega.
+6. Si se presenta el experimento, identificarlo como adicional y no dar por probados
+   los dos escenarios manuales aún pendientes.
+
+El deployment es Docker Compose local, sin alojamiento remoto ni persistencia de
+partidas entre reinicios. El importador persiste paquetes/perfiles, no sesiones.
+
+## Herramientas de apoyo
+
+Se utilizó Codex como herramienta de apoyo al desarrollo y revisión. La responsabilidad
+sobre código, pruebas y entrega corresponde al equipo. La declaración formal deberá
+ajustarse a la normativa del curso; este registro no presupone una política docente.
+
+El [registro de verificaciones anteriores](verificacion.md) se conserva como historial
+y no como certificación del commit definitivo.

@@ -1,6 +1,6 @@
 # Manifiesto game.json — contrato normativo 1
 
-Un paquete futuro agrupa `game.json`, servidor ESM, página web HTML y perfil analítico
+Un paquete agrupa `game.json`, servidor ESM, página web HTML y perfil analítico
 opcional. No se deduce identidad del nombre de la carpeta. El ID es estable
 entre versiones y se utiliza como `gameId`; cambiarlo identifica otro juego.
 La versión de juego cambia sin alterar su ID.
@@ -59,14 +59,15 @@ permitidos y obligatorios dependen exclusivamente del tipo:
 
 No hay referencias, callbacks, validadores ejecutables, objetos anidados,
 expresiones regulares configurables, URLs ni secretos. Los campos propios de un
-tipo se rechazan en los otros tipos. Los defaults permiten un formulario futuro
+tipo se rechazan en los otros tipos. Los defaults permiten un formulario
 genérico. El validador de manifiestos comprueba **la declaración y los defaults**.
-En Fase 2A, `validateOptions` y la fábrica también validan las opciones recibidas:
+`validateOptions` y la fábrica también validan las opciones recibidas:
 aplican defaults a campos omitidos, rechazan claves desconocidas y valores fuera
 de límites sin coerción, y entregan una copia congelada al plugin. No se implementa
-el formulario web ni la creación desde HTTP; véase [Fase 2A](phase-2a.md).
+la lógica de reglas en el formulario: la consola actual representa las opciones
+de forma genérica y la creación HTTP delega su validación al SDK.
 
-Ejemplo de tamaños discretos de Snake, sin instalar ni migrar ese juego:
+Declaración de tamaños discretos utilizada por Snake:
 
 ```json
 {"id":"size","label":"Tamaño","type":"integer","values":[12,20,28],"default":20}
@@ -102,17 +103,21 @@ dentro del paquete; cualquier escape mediante symlink/junction se rechaza.
 El discovery rechaza además candidatos que sean enlaces a directorios.
 
 `entrypoints.web` representa un documento HTML completo e independiente, diseñado
-para una futura carga en iframe. Puede incluir CSS y scripts ESM propios mediante
+para cargarse en iframe. Puede incluir CSS y scripts ESM propios mediante
 `<script type="module" src="./web.mjs">` e imports relativos. Un `.mjs` no es un
-entrypoint web válido. Esta fase no sirve ni abre la página y no implementa el
-iframe, su bridge ni aislamiento. La política de recursos/origen/permisos se
-definirá antes de integrar la web.
+entrypoint web válido. El validador solo comprueba los archivos; el servicio de
+assets y Bridge implementan su publicación, sandbox y políticas de recursos
+descritas en [3E.1](phase-3e1-web-bridge.md).
 
 Los archivos web y servidor solo se comprueban por existencia, ubicación y tipo;
 su sintaxis, exports y dependencias no se ejecutan ni se inspeccionan. Tampoco se
 recorren o validan recursos referidos desde HTML o imports ESM. El perfil
-analítico solo se localiza: no se valida su contenido ni se registra en Go/Scala.
+analítico solo se localiza en el validador de manifiestos: no se valida allí su
+contenido ni se registra en Go/Scala.
 `analytics.profile` no implica soporte automático de nuevos cálculos en Scala.
+El [importador experimental](phase-3i2-plugin-importer.md) exige ese archivo y
+coordina por separado su validación y activación analítica. No cambia la
+opcionalidad del campo en el formato general de manifiesto.
 
 El directorio configurado y los paquetes deben permanecer estables durante la
 inspección. La validación de rutas no constituye sandbox contra modificaciones

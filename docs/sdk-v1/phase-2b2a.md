@@ -1,5 +1,9 @@
 # Fase 2B.2A — protocolo de confirmación local
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Esta referencia conserva el protocolo y las correcciones auditadas de 2B.2A. La
 [Fase 2B.2B](phase-2b2b.md) añade la fachada JSON dispatch y concreta expectedVersion
 e historial de requestId, reutilizando este coordinador sin alterar confirmaciones,

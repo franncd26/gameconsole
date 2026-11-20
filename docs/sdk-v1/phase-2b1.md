@@ -1,5 +1,9 @@
 # Fase 2B.1 — activación y cierre con aceptación local
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Referencia del alcance auditado de 2B.1. La [Fase 2B.2A](phase-2b2a.md) añade
 coordinación de dominio optativa y la capacidad opcional acceptBatch del sink;
 se conservan los métodos y pruebas de ciclo de vida descritos aquí.

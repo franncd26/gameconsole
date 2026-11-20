@@ -1,5 +1,9 @@
 # Fase 3D.2 — Snake y Circuito como paquetes SDK
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Se añaden los dos plugins de servidor restantes. Los tres videojuegos pueden
 prepararse y activarse con el registro, loader, fábrica, manager, HTTP y Outbox
 existentes, sin modificar esos componentes ni Gato. No hay migración visual:
@@ -223,7 +227,7 @@ Las **19/19** pruebas nuevas pasaron además en una copia temporal sin .deps ni
 .git, verificando que los perfiles y suites no requieren repositorios externos.
 No se ejecutó la suite histórica con Prolog ni ningún humo real.
 
-## Humo manual real (no ejecutado por Codex)
+## Prueba manual complementaria
 
 Con Go y Scala ya iniciados por el equipo:
 

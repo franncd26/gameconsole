@@ -1,5 +1,9 @@
 # Fase 3G — Multiinstancia y experiencia de consola
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 La gestión de foco y presentación aquí descrita se amplía en
 [3H](phase-3h-game-experience.md), con preferencias de suspensión/reanudación y
 coordinación del control entre pestañas. La multiinstancia permanece intacta.

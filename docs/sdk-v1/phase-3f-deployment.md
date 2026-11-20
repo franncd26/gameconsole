@@ -1,5 +1,9 @@
 # Fase 3F — Despliegue local, CI e integración SDK
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Base inspeccionada: `a8fca405cfeb43d074fc889ac65f7f0c31964906`, rama
 `feature/gameconsole-sdk-v1`, árbol limpio antes de editar. El remoto de
 GameConsole está configurado como `https://github.com/JusMH/gameconsole.git`;
@@ -158,9 +162,9 @@ El proyecto CI usa gameconsole-ci-run_id-run_attempt. Guarda el JSON y hasta 100
 líneas por servicio de logs en fallo; upload y down usan always. La integración
 histórica de seis partidas y recovery siguen disponibles manualmente, pero no
 duplican esta ejecución pesada. No se publican imágenes ni se despliega un sitio
-remoto, ni se introducen secretos ficticios. No se disparó Actions desde Codex.
+remoto ni requiere secretos de despliegue. Esta etapa no registró una ejecución de Actions.
 
-## PENDIENTE DE VALIDACIÓN REAL
+## Verificaciones pendientes al cierre de la fase 3F
 
 - Ejecutar una construcción y arranque controlados con Docker/Compose.
 - Confirmar Prolog dentro de la imagen, root SDK y catálogo real.

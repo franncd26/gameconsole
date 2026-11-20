@@ -31,7 +31,7 @@ export async function runSDKIntegration({
     transport: fetcher === globalThis.fetch ? 'configured-http-services' : 'injected-test-transport',
     expectedGameStatsRef: pinnedRef, refVerification: 'Build source is checked by prepare/CI; HTTP does not expose its Git SHA.',
     stage: 'configuration', mutationsMayHaveOccurred: false, checks: [], creation: [], matches: [], cleanup: [] };
-  let signal, base, go;
+  let signal, base, go, deadlineTimer;
   const known = new Map();
   const route = s => '/api/sdk/matches/' + encodeURIComponent(s.matchId);
   const checked = name => report.checks.push(name);
@@ -134,7 +134,11 @@ export async function runSDKIntegration({
   try {
     requireCheck(Number.isSafeInteger(timeoutMs) && timeoutMs >= 1000 && timeoutMs <= 180000
       && Number.isSafeInteger(pollMs) && pollMs >= 100 && pollMs <= 2000, 'INVALID_TIME_LIMITS');
-    signal = AbortSignal.timeout(timeoutMs); base = origin(consoleURL); go = origin(goURL);
+    const deadline = new AbortController(); signal = deadline.signal;
+    // Unlike AbortSignal.timeout(), this referenced timer owns the global deadline
+    // even when a transport promise has no socket or other active event-loop handle.
+    deadlineTimer = setTimeout(() => deadline.abort(), timeoutMs);
+    base = origin(consoleURL); go = origin(goURL);
     report.stage = 'preflight';
     requireCheck((await local('/api/health')).status === 'ok' && (await remote('/health')).status === 'ok', 'HEALTH_FAILED');
     requireCheck((await local('/', { text: true })).includes('/sdk/console.mjs'), 'SDK_ROOT_NOT_ENABLED');
@@ -227,7 +231,7 @@ export async function runSDKIntegration({
       } catch { /* Keep the original stage/code, not private network/plugin errors. */ }
       report.cleanup.push({ matchId: snapshot.matchId, status });
     }
-  }
+  } finally { clearTimeout(deadlineTimer); }
   report.finishedAt = new Date().toISOString();
   if (evidenceFile !== null) {
     const file = evidenceFile instanceof URL ? fileURLToPath(evidenceFile) : evidenceFile;

@@ -1,5 +1,9 @@
 # Fase 3I.1 — Cuadrícula, estadísticas y teclado
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Base: `0538ec987d0410d748b675b9aa81cda8963a2ac3`, rama
 feature/gameconsole-sdk-v1. Cambios de navegador; no se modifican reglas, sesiones,
 identidades SDK, Web Locks, transporte de eventos ni analítica.

@@ -1,174 +1,75 @@
-# GameConsole SDK v1 — Fases 0–3I.2 experimental
+# Referencia técnica del SDK v1
 
-Esta carpeta define el contrato para una evolución incremental. **Están
-implementados manifiestos, registro y la infraestructura local de carga confiable,
-preparación y administración de sesiones de Fase 2A, y activación/cierre con eventos
-de ciclo de vida mediante EventSink inyectable de Fase 2B.1, y confirmación interna
-de datos/eventos/versiones de Fase 2B.2A y fachada dispatch JSON con historial
-acotado de Fase 2B.2B, y adaptador EventSink → EventOutbox con lotes de Fase 3A**.
-La [Fase 3C](phase-3c.md) añade bootstrap explícito de confianza y API optativa
-`/api/sdk/`, compartiendo el Outbox histórico. El equipo reporta PASSED del humo
-de transporte 3B y HTTP 3C contra Go/Scala. Las pruebas automatizadas usan fetcher simulado.
-La [Fase 3D.1](phase-3d1-gato.md) migra el servidor de Gato a un paquete autónomo;
-el equipo reporta PASSED de su humo con Prolog/Go/Scala reales.
-La [Fase 3D.2](phase-3d2-snake-racing.md) añade Snake y Circuito autónomos y
-concurrencia multijuego; su nuevo humo real queda preparado para ejecución manual.
-La [Fase 3E.1](phase-3e1-web-bridge.md) añade recursos web confiables, iframe
-sandbox y Bridge v1 con harness independiente y páginas de estado. Se comprobó
-el handshake de los tres plugins en navegador real con Go simulado.
-La [Fase 3E.2](phase-3e2-playable-web-games.md) añade las interfaces jugables
-independientes de Gato, Snake y Circuito, con acciones exclusivamente por Bridge.
-La [Fase 3E.3](phase-3e3-console-stats.md) compone la consola visual SDK, biblioteca
-genérica, partidas concurrentes y consultas en vivo a GameStats. Con SDK habilitado
-es la página principal; deshabilitado conserva el frontend histórico. No hay
-autenticación nueva. Los fixtures no son un cuarto juego.
-La [Fase 3F](phase-3f-deployment.md) prepara empaquetado Docker, activación SDK
-en Compose, CI main/manual e integración auténtica contra servicios desplegados.
-La nueva construcción y su ejecución real permanecen pendientes de validación.
-La [Fase 3G](phase-3g-multiinstance-experience.md) habilita múltiples instancias
-de los tres paquetes y añade selección enfocada/cuadrícula, navegación estable
-e historial con liberación visual de canales. No cambia Manager, Bridge ni analítica.
+La documentación principal de entrega es el [README](../../README.md),
+[arquitectura](../arquitectura.md), [integración](../integracion.md) y
+[estado de verificación](../entrega.md). Esta carpeta conserva contratos y la
+evolución técnica; los informes de fase no sustituyen las instrucciones actuales.
 
-- [Manifiesto normativo v1](manifest.md): campos, límites y reglas de archivos.
-- [Contrato diseñado de runtime y patrones](runtime-design.md): trabajo futuro.
-- [Fase 2A implementada](phase-2a.md): interfaces exactas, preparación y límites.
-- [Fase 2B.1 implementada](phase-2b1.md): eventos v1, aceptación local, activación y cierre.
-- [Fase 2B.2A implementada](phase-2b2a.md): celda optativa, confirmaciones, lotes y fallos parciales.
-- [Fase 2B.2B implementada](phase-2b2b.md): dispatch JSON, expectedVersion, replay e historial FIFO.
-- [Fase 3A implementada](phase-3a.md): OutboxEventSink, enqueueBatch, pruebas locales y humo manual pendiente.
-- [Fase 3C implementada](phase-3c.md): bootstrap confiable, rutas HTTP, límites y humo HTTP manual.
-- [Fase 3D.1 implementada](phase-3d1-gato.md): paquete autónomo Gato, reglas, IA Prolog y recuperación.
-- [Fase 3D.2 implementada](phase-3d2-snake-racing.md): paquetes Snake/Circuito y concurrencia de los tres juegos.
-- [Fase 3E.1 implementada](phase-3e1-web-bridge.md): assets confiables, CSP/sandbox, Bridge v1 y demo de conexión.
-- [Fase 3E.2 implementada](phase-3e2-playable-web-games.md): interfaces, controles, cadencia, recuperación y verificación ligera.
-- [Fase 3E.3 implementada](phase-3e3-console-stats.md): consola principal SDK, opciones dinámicas, pestañas y estadísticas Go/Scala.
-- [Fase 3F preparada](phase-3f-deployment.md): despliegue local, CI y evidencia de integración real pendiente.
-- [Fase 3G implementada](phase-3g-multiinstance-experience.md): multiinstancia, consola enfocada/cuadrícula e historial no destructivo.
-- [Fase 3H implementada](phase-3h-game-experience.md): preferencias de actividad local, reanudación, PRESENTATION y control cooperativo entre pestañas.
-- [Fase 3I.1 implementada](phase-3i1-multigame-ux.md): Pausa estable, resultados individuales en cuadrícula y navegación por teclado desde host/iframe.
-- [Fase 3I.2 experimental](phase-3i2-plugin-importer.md): instalación .game.zip, registro vivo, persistencia y supervisor Scala; Docker real pendiente.
-- [Baseline y revisión](baseline.md): protección de la base y verificación acotada.
+## Contratos y referencias vigentes
 
-## API implementada
+| Tema | Referencia |
+| --- | --- |
+| game.json, versiones, opciones, capacidades y rutas | [Manifiesto normativo](manifest.md) |
+| Loader, Factory y preparación de sesiones | [Interfaces 2A](phase-2a.md) y código server/sdk/ |
+| Activación/cierre y aceptación local | [2B.1](phase-2b1.md) y [EventSink/Outbox](phase-3a.md) |
+| Celda de estado y confirmación de transiciones | [2B.2A](phase-2b2a.md) |
+| dispatch, expectedVersion, requestId e idempotencia | [2B.2B](phase-2b2b.md) |
+| Bootstrap y rutas HTTP | [3C](phase-3c.md), actualizado por [integración](../integracion.md) |
+| Assets web, CSP, sandbox y Bridge v1 | [3E.1](phase-3e1-web-bridge.md), [PRESENTATION](phase-3h-game-experience.md) y [navegación](phase-3i1-multigame-ux.md) |
+| Importación experimental, persistencia y perfiles Scala | [3I.2](phase-3i2-plugin-importer.md) |
 
-Módulos ESM, solo bibliotecas estándar de Node.js 22:
+Los ejemplos de una fase describen su versión de la API. El código actual y los
+contratos posteriores prevalecen sobre limitaciones temporales: los tres plugins
+ya están migrados, tienen UI jugable y permiten múltiples instancias. La configuración
+académica habilita SDK y mantiene exactamente tres juegos; el importador es optativo.
+
+## Registro y confianza
 
 ```js
 import { validateManifest, loadManifest } from '../../server/sdk/manifest.mjs';
 import { GameRegistry, discoverPlugins } from '../../server/sdk/registry.mjs';
-
-// validateManifest(objetoJSON) valida estructura y devuelve una copia.
-// loadManifest(directorioPaquete) además comprueba archivos y rutas reales.
-// Ambos rechazan con ManifestError: {code, field, message}.
 const { registry, errors } = await discoverPlugins(directorioDePlugins);
-const internos = registry.list();
-const paquete = registry.get('sdk-example'); // undefined si no existe
-const publico = registry.publicCatalog();
+const metadata = registry.get('sdk-example');
+const catalog = registry.publicCatalog();
 ```
 
-El fragmento ilustra APIs internas; el bootstrap 3C las compone antes del servidor.
-`discoverPlugins()` usa por defecto `plugins/` en la raíz de este repositorio,
-independientemente del directorio de trabajo. No se crea esa carpeta ni se instala
-ningún paquete productivo ahora. Las rutas configurables se reciben como strings;
-una ruta relativa explícita se resuelve contra el directorio de trabajo de Node.
+Descubrimiento inspecciona subdirectorios inmediatos y ordena candidatos de forma
+determinista; no importa sus módulos. La raíz ausente produce un registro vacío.
+Cada paquete inválido se aísla y devuelve un rechazo saneado. El primer ID válido
+registrado se conserva y los siguientes producen DUPLICATE_ID, sin reemplazo.
 
-`GameRegistry.register(directorioPaquete)` es asíncrono y vuelve a validar el paquete.
-Devuelve `{manifest, directory, paths}`; `paths` contiene las rutas reales absolutas
-de `server`, `web` y, si existe, `profile`. `get` y `list` usan ese mismo formato;
-son APIs internas, nunca respuestas HTTP. `register` devuelve también una copia.
-Todas las lecturas devuelven copias profundas defensivas: modificarlas no modifica
-el registro. No existe API de sustitución, borrado ni carga de módulos.
+`register`, `get` y `list` entregan copias de `{manifest,directory,paths}` para uso
+interno. La opción interna `expected` de register comprueba los metadatos antes
+de publicar una candidatura del importador. No hay API pública de sustitución o borrado.
 
-`publicCatalog()` usa una lista explícita de campos: `id`, `name`, `version`,
-`description`, `category`, `capabilities`, `players`, `options`. Excluye entrypoints,
-perfil analítico, directorios y rutas resueltas. Los textos son metadatos no confiables:
-la futura UI deberá representarlos como texto, sin interpretarlos como HTML.
-No se publicarán las APIs internas ni los diagnósticos como catálogo público.
+`publicCatalog()` expone solo id, name, version, description, category, capabilities,
+players y options. Excluye directorios, módulos y rutas físicas; los textos se
+representan mediante APIs seguras del DOM.
 
-## Descubrimiento y fallos
+El bootstrap exige IDs confiables explícitos, bloquea errores de discovery y
+faltantes, y no autoriza automáticamente todos los paquetes encontrados. Puede
+haber paquetes válidos no autorizados que no se exponen. La configuración Compose
+académica establece tic-tac-toe, snake y racing; la prueba integrada comprueba ese
+catálogo exacto. El experimento añade autorizaciones mediante su instalador, sin
+recrear Manager ni cambiar la autoridad del SDK.
 
-Solo se consideran subdirectorios inmediatos. Los archivos sueltos se ignoran;
-los candidatos enlazados simbólicamente (incluidas junctions) se rechazan. Cada
-subdirectorio debe tener `game.json`; uno sin él produce un rechazo. Los nombres
-de carpetas se ordenan con comparación de unidades de código de JavaScript, sin
-dependencia del locale. El primer **paquete válido** que registra un ID gana;
-los siguientes reciben `DUPLICATE_ID`, sin sustitución silenciosa. Un paquete
-inválido no reserva su ID. `list` y `publicCatalog` se ordenan por ID.
+## Evolución histórica
 
-El resultado siempre contiene un registro y un arreglo de rechazos con
-`{candidate, code, field, message}`. `candidate` es un nombre de carpeta sencillo
-o una etiqueta ordinal si el nombre no es seguro; nunca una ruta absoluta.
-La raíz ausente (`ENOENT`) devuelve catálogo vacío y ningún error. Otros fallos
-al inspeccionar la raíz producen `DISCOVERY_IO` con `candidate: null`.
-Cada paquete rechazado se aísla y se continúa con los restantes.
+Los documentos siguientes conservan decisiones, pruebas y alcances de cada etapa.
+Las afirmaciones sobre funciones futuras o verificaciones pendientes corresponden
+a la fecha de esa etapa; el estado actual se registra en [entrega](../entrega.md).
 
-## Catálogo obligatorio y bootstrap
+- [Baseline 0/1](baseline.md) y [diseño original de runtime](runtime-design.md).
+- [2A: preparación](phase-2a.md), [2B.1: lifecycle](phase-2b1.md),
+  [2B.2A: transiciones](phase-2b2a.md) y [2B.2B: acciones](phase-2b2b.md).
+- [3A: transporte](phase-3a.md) y [3C: bootstrap/API](phase-3c.md).
+- [3D.1: Gato](phase-3d1-gato.md) y [3D.2: Snake/Circuito](phase-3d2-snake-racing.md).
+- [3E.1: Bridge](phase-3e1-web-bridge.md), [3E.2: interfaces](phase-3e2-playable-web-games.md)
+  y [3E.3: consola/estadísticas](phase-3e3-console-stats.md).
+- [3F: preparación de despliegue](phase-3f-deployment.md),
+  [3G: multiinstancia](phase-3g-multiinstance-experience.md),
+  [3H: actividad local](phase-3h-game-experience.md) y [3I.1: UX multijuego](phase-3i1-multigame-ux.md).
 
-El resultado de discovery es un diagnóstico utilizable, **no una autorización de
-arranque**. Se conserva la política de primer paquete válido para inspección y
-pruebas. Que el registro contenga un ID no resuelve un conflicto si existe además
-un rechazo `DUPLICATE_ID`. No se elegirá silenciosamente un ganador en producción.
-
-Antes de publicar rutas o aceptar partidas SDK, el bootstrap 3C revisa errores e
-IDs confiables requeridos. Para el futuro despliegue académico migrado se deberá:
-
-1. Ejecutar discovery y revisar todos sus errores. Cualquier rechazo, incluidos
-   duplicados y errores de lectura, bloqueará el arranque productivo con un
-   diagnóstico explícito. Los paquetes siguen aislados durante la inspección.
-2. Comparar los IDs válidos con un conjunto obligatorio configurado y aprobado
-   para el despliegue. Para la entrega académica será exactamente
-   `tic-tac-toe`, `snake`, `racing`: faltantes y extras bloquearán el arranque,
-   incluso si la raíz ausente devolvió un registro vacío sin errores.
-3. Habilitar la aplicación solo tras superar ambas comprobaciones; sin fallback
-   silencioso a un catálogo parcial ni selección implícita de un duplicado.
-
-El conjunto pertenece a la configuración del despliegue, no al SDK genérico ni a
-condiciones por juego en el registro. Esto permite N paquetes en otros despliegues.
-La comprobación será previa a la apertura del servidor, sin necesidad de cambiar
-la API del discovery. **3C implementa esa comprobación de errores y faltantes para
-la lista confiable explícita**, permite otros paquetes válidos no autorizados y
-no impone todavía el catálogo académico migrado de tres juegos. La API es optativa
-y de desarrollo; véase [configuración exacta](phase-3c.md). No deben desplegarse
-los fixtures como plugins productivos. No se cambia
-el comportamiento de directorio ausente ni la política actual de registro.
-
-Códigos: `INVALID_JSON`, `INVALID_MANIFEST`, `INCOMPATIBLE_VERSION`, `UNSAFE_PATH`,
-`INVALID_PATH`, `DUPLICATE_ID`, `DISCOVERY_IO`. Los mensajes incluyen un campo del
-contrato y una explicación fija; no incluyen contenido del JSON, mensajes crudos
-del sistema de archivos ni rutas locales. El descubrimiento no usa `import()`,
-`require`, procesos externos, sockets ni ejecución de contenido del paquete.
-
-## Verificación aislada
-
-Desde la raíz de GameConsole:
-
-```powershell
-node --check server/sdk/manifest.mjs
-node --check server/sdk/registry.mjs
-node --check server/sdk/values.mjs
-node --check server/sdk/options.mjs
-node --check server/sdk/initialization.mjs
-node --check server/sdk/loader.mjs
-node --check server/sdk/session-factory.mjs
-node --check server/sdk/instance-manager.mjs
-node --check server/sdk/event-adapter.mjs
-node --check server/sdk/actions.mjs
-node --check test/sdk-v1.test.mjs
-node --check test/sdk-runtime.test.mjs
-node --check test/sdk-lifecycle.test.mjs
-node --check test/sdk-transitions.test.mjs
-node --check test/sdk-actions.test.mjs
-node --check test/fixtures/sdk-v1/example/server.mjs
-node --check test/fixtures/sdk-v1/example/web.mjs
-node --check test/fixtures/sdk-runtime/counter/server.mjs
-node --check test/fixtures/sdk-transitions/plugin.mjs
-node --check test/fixtures/sdk-actions/plugin.mjs
-node --test test/sdk-v1.test.mjs test/sdk-runtime.test.mjs test/sdk-lifecycle.test.mjs test/sdk-transitions.test.mjs test/sdk-actions.test.mjs
-```
-
-La verificación HTTP/Outbox completa de 3C está en [phase-3c.md](phase-3c.md).
-No usar `npm test` para esta revisión acotada: incluye pruebas históricas con
-servicios y Prolog. La nueva prueba solo usa memoria y archivos temporales; no
-ejecuta los entrypoints trampa del fixture. El caso de symlink/junction informa
-un skip explícito si el sistema no permite crear el enlace. `web.mjs` es ahora un
-recurso de la página `web.html`; comprobar su sintaxis no ejecuta la página.
+Las comprobaciones actuales se ejecutan con `npm run check` y `npm test` desde la
+raíz. La suite completa necesita SWI-Prolog y Python 3. Los scripts de humo real
+requieren sus servicios/configuración; las pruebas con dobles no certifican Go/Scala.

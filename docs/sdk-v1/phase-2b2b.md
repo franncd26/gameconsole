@@ -1,5 +1,9 @@
 # Fase 2B.2B — dispatch JSON, versiones e idempotencia en memoria
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Se añade `await manager.dispatch(matchId, action)` como fachada de datos del SDK.
 No se crean endpoints HTTP, frontend, cuentas, autenticación o autorización de
 jugadores. Las clases históricas y su integración actual siguen independientes.

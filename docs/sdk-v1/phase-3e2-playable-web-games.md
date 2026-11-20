@@ -1,5 +1,9 @@
 # Fase 3E.2 — Interfaces jugables independientes
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 La política de foco descrita en esta fase histórica fue sustituida por
 [3H](phase-3h-game-experience.md): blur libera entradas sin desarmar, la consola
 comunica visibilidad y preferencias, y el control se coordina entre pestañas.

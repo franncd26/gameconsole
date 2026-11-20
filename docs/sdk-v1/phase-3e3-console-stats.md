@@ -1,5 +1,9 @@
 # Fase 3E.3 — Consola SDK y estadísticas
 
+> **Informe histórico de etapa.** Los alcances, comandos y verificaciones siguientes
+> corresponden a esta fase; no son la guía de despliegue vigente. Consultar el
+> [README principal](../../README.md) y el [estado de entrega](../entrega.md).
+
 Base `4342ad6b7f7648d47fbec0cb38e586ea976621ad`, rama
 `feature/gameconsole-sdk-v1`. Implementa la aplicación anfitriona sobre las rutas
 y Bridge existentes. No cambia reglas, sesiones, opciones normativas, perfiles,
